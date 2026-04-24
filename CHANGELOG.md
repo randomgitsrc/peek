@@ -5,6 +5,23 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复
+
+- 修复 CLI 创建的条目 URL 格式错误（`http://host/view/slug` → `http://host/slug`）
+  - 问题：`peekview create` 生成的 URL 包含 `/view/` 前缀，但实际路由不匹配
+  - 修复：移除 `build_view_url` 中的 `/view/` 前缀，与前端路由保持一致
+  - 影响文件：`backend/peekview/config.py`, `backend/tests/test_config.py`, `backend/tests/test_entry_service.py`, `backend/tests/test_api.py`
+
+## [0.1.3] - 2026-04-24
+
+### 新增
+
+- 添加 pipx 安装说明（推荐安装方式）
+- 建立开发流程章程 (`docs/process/workflow.md`)
+- 添加活跃任务看板 (`docs/process/active-tasks.md`)
+
 ## [0.1.2] - 2026-04-24
 
 ### 修复
@@ -34,14 +51,14 @@
   - SQLite 数据库，支持 WAL 模式和 FTS5 全文搜索
   - 文件存储服务，原子写入和路径遍历防护
   - 完整的安全机制（allowlist、symlink 检测、API Key 认证）
-  
+
 - CLI 工具
   - `peek serve` - 启动 Web 服务
   - `peek create` - 创建条目（支持文件、stdin、目录）
   - `peek get` - 获取条目详情
   - `peek list` - 列出入库（支持搜索、标签过滤、分页）
   - `peek delete` - 删除条目
-  
+
 - Web 前端
   - Vue 3 + Vite + TypeScript 项目
   - Shiki 代码高亮，支持 CSS 变量主题
@@ -51,13 +68,13 @@
   - 移动端适配（抽屉菜单、底部工具栏）
   - EntryListView（条目列表、搜索、分页）
   - EntryDetailView（详情页、文件切换、TOC）
-  
+
 - 测试体系
   - 98 个前端单元测试（Vitest）
   - E2E 测试配置（Playwright）
   - 后端安全测试（26 个测试）
   - CLI 测试（32 个测试）
-  
+
 ### 安全
 
 - 路径遍历防护（allowlist 机制）

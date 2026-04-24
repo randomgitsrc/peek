@@ -42,7 +42,7 @@ class TestCreateEntry:
             files_data=[{"path": "main.py", "content": "print('hello')"}],
         )
         assert result.slug == "test"
-        assert result.url.endswith("/view/test")
+        assert result.url.endswith("/test")
 
     def test_create_auto_slug(self, entry_service):
         result = entry_service.create_entry(summary="Auto slug")

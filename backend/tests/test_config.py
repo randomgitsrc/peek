@@ -113,12 +113,12 @@ class TestPeekConfig:
     def test_build_view_url_auto(self):
         """Build view URL with auto-detected base."""
         config = PeekConfig(server=PeekServer(host="localhost", port=8080))
-        assert config.build_view_url("test-slug") == "http://localhost:8080/view/test-slug"
+        assert config.build_view_url("test-slug") == "http://localhost:8080/test-slug"
 
     def test_build_view_url_custom(self):
         """Build view URL with custom base."""
         config = PeekConfig(server=PeekServer(base_url="https://peekview.example.com"))
-        assert config.build_view_url("test-slug") == "https://peekview.example.com/view/test-slug"
+        assert config.build_view_url("test-slug") == "https://peekview.example.com/test-slug"
 
     def test_ensure_directories(self, tmp_path):
         """Ensure directories creates paths."""

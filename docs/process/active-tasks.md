@@ -20,9 +20,27 @@
 
 > 最后更新：2026-04-24
 
-### 暂无活跃任务
+### Task 17: 修复生成的URL链接错误
 
-MVP已完成，等待新需求规划。
+**状态**: ✅ 已完成  
+**完成日期**: 2026-04-24  
+**版本**: v0.1.4 (待发布)
+
+**问题**: `peekview create` 生成的 URL 包含 `/view/` 前缀，但实际路由不匹配
+
+**修复内容**:
+- [x] 修改 `backend/peekview/config.py` - 移除 `/view/` 前缀
+- [x] 更新 `backend/tests/test_config.py` - 修复 URL 测试断言
+- [x] 更新 `backend/tests/test_entry_service.py` - 修复 URL 测试断言  
+- [x] 更新 `backend/tests/test_api.py` - 修复 URL 测试断言
+- [x] 更新 `CHANGELOG.md` - 记录修复
+- [x] 全量测试通过 (292 passed, 2 skipped)
+
+**变更说明**:
+- 前端路由配置为 `/:slug`，后端生成 URL 应该匹配此格式
+- 移除 `/view/` 前缀后，URL 从 `http://host/view/slug` 变为 `http://host/slug`
+
+---
 
 ---
 

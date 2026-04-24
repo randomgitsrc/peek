@@ -63,7 +63,7 @@ class TestCreateEntry:
         data = resp.json()
         # Slug may have suffix if conflict, but should start with our slug
         assert data["slug"].startswith("create-test")
-        assert "/view/" in data["url"]
+        assert data["url"].endswith(f"/{data['slug']}")
 
     @pytest.mark.asyncio
     async def test_create_missing_summary(self, client):

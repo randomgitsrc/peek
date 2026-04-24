@@ -209,7 +209,7 @@ class PeekConfig(BaseSettings):
             base = self.server.base_url.rstrip("/")
         else:
             base = f"http://{self.server.host}:{self.server.port}"
-        return f"{base}/view/{slug}"
+        return f"{base}/{slug}"
 
     def is_local_path_allowed(self, path: Path) -> bool:
         """Check if a local path is in the allowlist.
