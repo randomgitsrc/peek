@@ -19,8 +19,9 @@
 
 | 阶段 | 检查文件 | 完成标准 |
 |------|----------|----------|
-| **P1 需求** | `docs/specs/*` 或 `docs/plans/work-plan.md` | 文档已更新，描述清晰 |
+| **P1 需求** | `docs/specs/*` | 文档已更新，描述清晰 |
 | **P2 计划** | `docs/plans/impl-plan.md` 任务条目 | 任务已分解，有验收标准 |
+| **P2.5 活跃** | `docs/process/active-tasks.md` | 任务已移入活跃看板 |
 | **P3 实现** | 代码文件 + `tests/` 测试 | 单元测试通过 |
 | **P4 验证** | 测试全部通过 | `make test` 或 `npm test` 0 failures |
 | **P5 发布** | `CHANGELOG.md` + 版本号更新 | PyPI/GitHub 同步完成 |
@@ -31,8 +32,10 @@
 
 每次进入项目目录，我必须按顺序读取：
 1. `CLAUDE.md` - 项目上下文
-2. `INDEX.md` 或 `docs/plans/impl-plan.md` - 当前任务状态
-3. `CHANGELOG.md` - 最新版本（如果需要发布）
+2. **`docs/process/workflow.md`** - **必读：开发流程章程**
+3. **`docs/process/active-tasks.md`** - 当前进行中的任务
+4. `docs/plans/impl-plan.md` - 待规划任务
+5. `CHANGELOG.md` - 最新版本（如果需要发布）
 
 ### 规则 2：文档变更检查
 
@@ -40,10 +43,16 @@
 
 | 变更类型 | 必须先更新的文档 |
 |----------|------------------|
-| 新功能 | `docs/plans/impl-plan.md` 任务定义 |
-| Bug修复 | `CHANGELOG.md` 记录 |
+| 新功能 | `docs/plans/impl-plan.md` 任务定义 → `docs/process/active-tasks.md` |
+| Bug修复 | `CHANGELOG.md` 记录 + `docs/process/active-tasks.md` |
 | 配置变更 | 相关 spec/design 文档 |
 | 接口变更 | API 文档（docstring也算） |
+
+**任务追踪流程**：
+1. 新需求 → 更新 `impl-plan.md`（分配Task编号）
+2. 准备执行 → 移入 `active-tasks.md`（标记为"进行中"）
+3. 开发完成 → 更新 `active-tasks.md`（标记为"待验证"）
+4. 验证通过 → 更新 `CHANGELOG.md` → 从 `active-tasks.md` 移除
 
 **如果文档未更新**：
 - 小改动（<10行）：我可以边改代码边补文档，但必须同一次提交
@@ -51,10 +60,19 @@
 
 ### 规则 3：测试强制执行
 
-**每个代码变更必须有测试覆盖**：
-- 新功能 → 新增测试
-- Bug修复 → 新增回归测试
-- 重构 → 确保现有测试仍通过
+**每个代码变更必须有测试覆盖**，按以下优先级：
+
+| 覆盖级别 | 要求 | 适用场景 |
+|----------|------|----------|
+| **核心功能** | 100% 覆盖 | 所有P0功能、安全相关代码 |
+| **受影响功能** | 100% 覆盖 | 本次改动可能影响的其他模块 |
+| **直接功能** | 100% 覆盖 | 本次改动直接涉及的新功能/修复 |
+| **周边功能** | 回归测试通过即可 | 与改动无直接关联的模块 |
+
+**测试执行顺序**：
+1. 先跑改动模块的单元测试（快速反馈）
+2. 再跑受影响模块的测试（识别副作用）
+3. 最后全量测试（最终验证）
 
 **测试失败处理**：
 1. 分析失败原因
@@ -87,6 +105,26 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 2. **回滚到上一阶段的稳定状态**（git reset/stash）
 3. 重新分析并修改文档
 4. 重新开始实现
+
+### 规则 6：发布策略
+
+**不自动发布，累积后主动询问**：
+
+1. **单个任务完成后**：提交到GitHub，不发布
+2. **一批任务完成后**（由你指定的多个任务完成）：主动询问是否发布
+3. **发布前检查清单**（必须全部完成）：
+   - [ ] CHANGELOG.md 已更新（记录本次发布的所有变更）
+   - [ ] 版本号已更新（pyproject.toml, cli.py, package.json）
+   - [ ] 全量测试通过
+   - [ ] 文档已同步（README, DEPLOYMENT, CLAUDE等）
+   - [ ] GitHub已push（提交 + tag）
+   - [ ] PyPI已上传（build + twine upload）
+   - [ ] 安装验证通过（`pipx install peekview` 测试）
+
+**版本号规则**：
+- `MAJOR`: 不兼容变更（MVP阶段不考虑）
+- `MINOR`: 新功能
+- `PATCH`: Bug修复
 
 ## 我的限制（我必须承认的）
 
