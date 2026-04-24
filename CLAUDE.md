@@ -40,9 +40,13 @@ peekview/
 From `backend/` directory:
 
 ```bash
-# Setup
+# Setup (development)
 pip install -e ".[test]"    # Install with test deps
 make build                 # Same as above
+
+# Production install
+pip install peekview       # PyPI install
+pipx install peekview      # Recommended: isolated environment, no conflicts
 
 # Development
 make dev                   # uvicorn peekview.main:app --reload (port 8080)
