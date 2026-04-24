@@ -1,4 +1,4 @@
-"""File storage management for Peek.
+"""File storage management for PeekView.
 
 Handles file operations with:
 - Atomic writes (temp → rename)
@@ -13,9 +13,9 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from peek.config import PeekConfig
-from peek.exceptions import ForbiddenPathError, StorageError
-from peek.models import Entry
+from peekview.config import PeekConfig
+from peekview.exceptions import ForbiddenPathError, StorageError
+from peekview.models import Entry
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def validate_local_path(
     if not config.is_local_path_allowed(resolved):
         raise ForbiddenPathError(
             f"Path not in allowed directories: {local_path}. "
-            f"Configure 'allowed_paths' in ~/.peek/config.yaml"
+            f"Configure 'allowed_paths' in ~/.peekview/config.yaml"
         )
 
     # Check file exists

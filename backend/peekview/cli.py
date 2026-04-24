@@ -17,19 +17,19 @@ import click
 from sqlalchemy import select
 from sqlmodel import Session
 
-from peek.config import PeekConfig
-from peek.database import init_db
-from peek.main import create_app
-from peek.models import CreateEntryRequest, EntryCreate
-from peek.services.entry_service import EntryService
-from peek.services.file_service import scan_directory
-from peek.storage import StorageManager
+from peekview.config import PeekConfig
+from peekview.database import init_db
+from peekview.main import create_app
+from peekview.models import CreateEntryRequest, EntryCreate
+from peekview.services.entry_service import EntryService
+from peekview.services.file_service import scan_directory
+from peekview.storage import StorageManager
 
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="peek")
+@click.version_option(version="0.1.2", prog_name="peekview")
 def cli() -> None:
-    """Peek - A lightweight code & document formatting display service."""
+    """PeekView - A lightweight code & document formatting display service."""
     pass
 
 
@@ -40,12 +40,12 @@ def cli() -> None:
 @click.option("--workers", "-w", default=1, type=int, help="Number of worker processes")
 @click.pass_context
 def serve(ctx: click.Context, host: str | None, port: int | None, reload: bool, workers: int) -> None:
-    """Start the Peek server.
+    """Start the PeekView server.
 
     Examples:
-        peek serve                    # Start with default config
-        peek serve -p 3000           # Start on port 3000
-        peek serve --reload          # Development mode with auto-reload
+        peekview serve                    # Start with default config
+        peekview serve -p 3000           # Start on port 3000
+        peekview serve --reload          # Development mode with auto-reload
     """
     import uvicorn
 
@@ -66,7 +66,7 @@ def serve(ctx: click.Context, host: str | None, port: int | None, reload: bool, 
     click.echo(f"Database: {config.db_path}")
 
     uvicorn.run(
-        "peek.main:get_app",
+        "peekview.main:get_app",
         host=bind_host,
         port=bind_port,
         reload=reload,
@@ -95,10 +95,10 @@ def create(
     """Create a new entry.
 
     Examples:
-        peek create file.txt -s "My code"
-        peek create src/*.py -s "Python project" -t python -t cli
-        peek create -s "From stdin" --from-stdin < code.py
-        echo "content" | peek create -s "From pipe" --from-stdin
+        peekview create file.txt -s "My code"
+        peekview create src/*.py -s "Python project" -t python -t cli
+        peekview create -s "From stdin" --from-stdin < code.py
+        echo "content" | peekview create -s "From pipe" --from-stdin
     """
     config = PeekConfig()
     config.ensure_directories()
@@ -186,8 +186,8 @@ def get(slug: str, json_output: bool) -> None:
     """Get entry details by slug.
 
     Examples:
-        peek get my-entry
-        peek get my-entry --json
+        peekview get my-entry
+        peekview get my-entry --json
     """
     config = PeekConfig()
     engine = init_db(config.db_path)
@@ -251,10 +251,10 @@ def list_entries(
     """List entries with optional filters.
 
     Examples:
-        peek list
-        peek list -q "python"
-        peek list -t cli -t python
-        peek list --status active
+        peekview list
+        peekview list -q "python"
+        peekview list -t cli -t python
+        peekview list --status active
     """
     config = PeekConfig()
     engine = init_db(config.db_path)
@@ -312,8 +312,8 @@ def delete(slug: str) -> None:
     """Delete an entry by slug.
 
     Examples:
-        peek delete my-entry
-        peek delete my-entry --yes  # Skip confirmation
+        peekview delete my-entry
+        peekview delete my-entry --yes  # Skip confirmation
     """
     config = PeekConfig()
     engine = init_db(config.db_path)
