@@ -29,7 +29,7 @@
 ### 方式一：从 PyPI 安装（推荐，发布后可用）
 
 ```bash
-pip install peek
+pip install peekview
 ```
 
 ### 方式二：从源码安装（当前可用）
@@ -320,7 +320,7 @@ curl -X DELETE http://localhost:8080/api/v1/entries/{slug}
 pkill -f "peek serve"
 
 # 2. 卸载包
-pip uninstall peek -y
+pip uninstall peekview -y
 
 # 3. 清理数据（可选）
 rm -rf ~/.peek

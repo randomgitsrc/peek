@@ -15,7 +15,7 @@ Agent（AI）产出 → Peek 格式化 → 人类友好查看
 ### 安装
 
 ```bash
-pip install peek
+pip install peekview
 ```
 
 或从源码安装：

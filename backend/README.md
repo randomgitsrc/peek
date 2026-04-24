@@ -9,7 +9,7 @@ A lightweight code & document formatting display service.
 ### 安装
 
 ```bash
-pip install peek
+pip install peekview
 ```
 
 ### 启动服务
