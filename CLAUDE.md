@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Current State:** Backend and frontend both complete (Tasks 0-16)
 - **Architecture:** FastAPI (Python 3.12+) + SQLite (WAL mode, FTS5) backend, Vue 3 + Vite + TypeScript + Shiki SPA frontend
 - **Key Docs:** All specs in `docs/specs/`, implementation plan in `docs/plans/impl-plan.md`, adversarial reviews in `docs/reviews/`
+- **Dev Process:** Standard workflow in `docs/process/workflow.md` - **READ THIS FIRST** before starting any work
 
 ## Project Structure
 
