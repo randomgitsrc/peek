@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     config: PeekConfig = app.state.config
-    logger.info(f"Starting Peek server v{app.version}")
+    logger.info(f"Starting PeekView server v{app.version}")
     logger.info(f"Data directory: {config.data_dir}")
     logger.info(f"Database: {config.db_path}")
 
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Shutting down Peek server")
+    logger.info("Shutting down PeekView server")
 
 
 def create_app(
@@ -55,7 +55,7 @@ def create_app(
         Configured FastAPI application
     """
     app = FastAPI(
-        title="Peek",
+        title="PeekView",
         description="A lightweight code & document formatting display service",
         version="0.1.0",
         lifespan=lifespan,
@@ -175,7 +175,7 @@ def _setup_static_files(app: FastAPI) -> None:
         possible_paths = [
             # Development: frontend/dist
             Path(__file__).parent.parent.parent / "frontend" / "dist",
-            # Installed package: peek/static
+            # Installed package: peekview/static
             Path(__file__).parent / "static",
         ]
 
@@ -216,7 +216,7 @@ def get_app() -> FastAPI:
     """Lazy app factory for uvicorn.
 
     Use this with uvicorn's factory mode to avoid import-time side effects:
-        uvicorn peek.main:get_app --factory
+        uvicorn peekview.main:get_app --factory
 
     Returns:
         FastAPI application instance

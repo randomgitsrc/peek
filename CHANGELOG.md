@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.2] - 2026-04-24
+
+### 修复
+
+- 修复 CLI 中 `uvicorn.run` 引用的模块路径错误 (`peek.main` → `peekview.main`)
+- 修复所有文档字符串和注释中的项目名称 (`Peek` → `PeekView`)
+- 修复错误信息中的配置路径 (`~/.peek` → `~/.peekview`)
+- 更新版本号至 0.1.1（CLI 和帮助信息）
+
 ## [0.1.1] - 2026-04-24
 
 ### 变更

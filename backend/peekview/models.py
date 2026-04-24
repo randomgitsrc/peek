@@ -1,4 +1,4 @@
-"""SQLModel data models for Peek.
+"""SQLModel data models for PeekView.
 
 Defines Entry and File models with proper relationships,
 indexes, and FTS5 integration.

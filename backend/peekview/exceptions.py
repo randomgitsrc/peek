@@ -1,4 +1,4 @@
-"""Exception hierarchy for Peek.
+"""Exception hierarchy for PeekView.
 
 All exceptions inherit from PeekError and provide:
 - status_code: HTTP status code for API responses
@@ -8,7 +8,7 @@ All exceptions inherit from PeekError and provide:
 
 
 class PeekError(Exception):
-    """Base exception for all Peek errors.
+    """Base exception for all PeekView errors.
 
     Attributes:
         status_code: HTTP status code (default 500)
