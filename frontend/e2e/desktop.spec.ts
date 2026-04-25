@@ -144,8 +144,8 @@ test.describe('Code Viewing', () => {
     await page.goto('/code-entry')
     await page.waitForSelector('.code-viewer', { timeout: 5000 })
 
-    // Click copy button
-    const copyBtn = page.locator('.copy-btn')
+    // Click copy button - target desktop header buttons only (not mobile)
+    const copyBtn = page.locator('.header-right .action-btn').filter({ hasText: /Copy/ })
     await expect(copyBtn).toBeVisible()
     await copyBtn.click()
 
@@ -157,7 +157,8 @@ test.describe('Code Viewing', () => {
     await page.goto('/code-entry')
     await page.waitForSelector('.code-viewer', { timeout: 5000 })
 
-    const wrapBtn = page.locator('.wrap-btn')
+    // Find wrap button by text (Wrap or No wrap) - target desktop header only
+    const wrapBtn = page.locator('.header-right .action-btn').filter({ hasText: /Wrap/ })
     await expect(wrapBtn).toBeVisible()
 
     // Toggle wrap mode
