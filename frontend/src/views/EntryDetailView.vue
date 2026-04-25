@@ -729,8 +729,28 @@ onMounted(doFetchEntry)
   font-size: var(--font-sm);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
+/* Mobile bottom bar styles */
+.mobile-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-bottom-bar .action-bar {
+  display: flex;
+  justify-content: space-around;
+  height: 100%;
+  padding: var(--space-2) var(--space-4);
+}
+
+/* Responsive - use 1023px breakpoint to match desktop-only/mobile-only utilities */
+@media (max-width: 1023px) {
   .entry-detail-view {
     padding: var(--space-3);
     padding-bottom: calc(72px + env(safe-area-inset-bottom)); /* RESP-M-04/05: iOS safe area + bottom padding */
