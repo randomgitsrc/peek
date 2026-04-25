@@ -59,13 +59,10 @@ async function doHighlight() {
 
   isLoading.value = true
   try {
-    console.log('[CodeViewer] Highlighting', props.language, props.content.substring(0, 50))
-    highlighted.value = await highlight(
+  highlighted.value = await highlight(
       props.content,
       props.language || 'text',
     )
-    console.log('[CodeViewer] Highlighted result length:', highlighted.value.length)
-    console.log('[CodeViewer] First 200 chars:', highlighted.value.substring(0, 200))
   } catch (err) {
     console.error('[CodeViewer] Highlight error:', err)
     highlighted.value = ''
