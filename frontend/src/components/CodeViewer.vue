@@ -1,24 +1,9 @@
 <template>
   <div class="code-viewer" ref="container">
+    <!-- Header with filename only -->
     <div class="code-header">
       <span class="filename">{{ filename }}</span>
       <span class="line-count" v-if="lineCount">{{ lineCount }} lines</span>
-      <button
-        class="header-btn copy-btn"
-        @click="copyCode"
-        :aria-label="copied ? 'Copied to clipboard' : 'Copy code'"
-        :title="copied ? 'Copied!' : 'Copy'"
-      >
-        {{ copied ? '✓' : 'Copy' }}
-      </button>
-      <button
-        class="header-btn wrap-btn"
-        @click="wrap = !wrap"
-        :aria-label="wrap ? 'Disable word wrap' : 'Enable word wrap'"
-        :title="wrap ? 'No wrap' : 'Wrap'"
-      >
-        {{ wrap ? '↩' : '→' }}
-      </button>
     </div>
 
     <!-- Loading state -->
@@ -29,7 +14,7 @@
       </div>
     </div>
 
-    <!-- Shiki highlighted code (v-html — safe: Shiki output is sanitized) -->
+    <!-- Shiki highlighted code -->
     <div
       v-else-if="highlighted"
       class="code-content"
@@ -37,14 +22,9 @@
       v-html="highlighted"
     ></div>
 
-    <!-- Safe fallback: Vue template rendering, no v-html (review §16) -->
+    <!-- Safe fallback -->
     <div v-else class="code-content fallback" :class="{ wrap }">
-      <pre>
-        <div v-for="(line, i) in content.split('\n')" :key="i" class="code-line" :id="`L${i + 1}`">
-          <span class="line-number">{{ i + 1 }}</span>
-          <span class="line-content">{{ line }}</span>
-        </div>
-      </pre>
+      <pre><code>{{ content }}</code></pre>
     </div>
 
     <div v-if="isEmpty" class="empty-file">Empty file</div>
@@ -52,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, nextTick } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useShiki } from '../composables/useShiki'
 
 const props = defineProps<{
@@ -60,15 +40,13 @@ const props = defineProps<{
   filename: string
   language: string | null
   lineCount: number | null
+  wrap: boolean
 }>()
 
 const { highlight } = useShiki()
 
 const highlighted = ref('')
 const isLoading = ref(true)
-const copied = ref(false)
-const wrap = ref(false)
-const container = ref<HTMLElement>()
 
 const isEmpty = computed(() => props.content.length === 0)
 
@@ -86,7 +64,6 @@ async function doHighlight() {
       props.language || 'text',
     )
   } catch {
-    // Fallback: leave highlighted empty, Vue template fallback will render
     highlighted.value = ''
   } finally {
     isLoading.value = false
@@ -97,42 +74,29 @@ async function doHighlight() {
 watch(
   () => [props.content, props.language],
   () => doHighlight(),
+  { immediate: true },
 )
 
-onMounted(doHighlight)
-
-// Line selection from URL hash (#L5 or #L5-L10)
 onMounted(() => {
+  // Line selection from URL hash
   const hash = window.location.hash
   if (hash.startsWith('#L')) {
-    nextTick(() => {
+    setTimeout(() => {
       const el = document.querySelector(hash)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         el.classList.add('line-highlight')
       }
-    })
+    }, 100)
   }
 })
-
-async function copyCode() {
-  try {
-    await navigator.clipboard.writeText(props.content)
-    copied.value = true
-    setTimeout(() => {
-      copied.value = false
-    }, 2000)
-  } catch {
-    // Clipboard API not available — ignore silently
-  }
-}
 </script>
 
 <style scoped>
 .code-viewer {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  overflow: auto; /* SCROLL-CODE-01/02: Enable scroll */
+  overflow: auto;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 200px);
@@ -155,30 +119,83 @@ async function copyCode() {
 
 .line-count {
   color: var(--text-secondary);
-}
-
-.header-btn {
-  background: none;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 2px var(--space-2);
-  cursor: pointer;
   font-size: var(--font-xs);
+}
+
+/* Code content - Shiki output */
+.code-content {
+  padding: var(--space-3);
+  overflow: auto;
+  font-size: var(--font-sm);
+  line-height: var(--line-height-code);
+  background: var(--bg-secondary);
+  flex: 1;
+}
+
+.code-content :deep(pre) {
+  margin: 0;
+  background: transparent !important;
+  overflow: visible;
+}
+
+.code-content :deep(code) {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  font-size: var(--font-sm);
+  line-height: var(--line-height-code);
+}
+
+/* Ensure Shiki tokens use CSS variables */
+.code-content :deep(.shiki) {
+  background: transparent !important;
+}
+
+.code-content :deep(.shiki code) {
+  background: transparent !important;
+}
+
+/* Token colors using CSS variables */
+.code-content :deep(.token.keyword) { color: var(--shiki-token-keyword); }
+.code-content :deep(.token.string) { color: var(--shiki-token-string); }
+.code-content :deep(.token.number) { color: var(--shiki-token-number); }
+.code-content :deep(.token.comment) { color: var(--shiki-token-comment); }
+.code-content :deep(.token.function) { color: var(--shiki-token-function); }
+.code-content :deep(.token.class-name) { color: var(--shiki-token-class); }
+.code-content :deep(.token.operator) { color: var(--shiki-token-operator); }
+.code-content :deep(.token.punctuation) { color: var(--shiki-token-punctuation); }
+.code-content :deep(.token.property) { color: var(--shiki-token-property); }
+.code-content :deep(.token.variable) { color: var(--shiki-token-variable); }
+.code-content :deep(.token.constant) { color: var(--shiki-token-constant); }
+.code-content :deep(.token.builtin) { color: var(--shiki-token-builtin); }
+.code-content :deep(.token.tag) { color: var(--shiki-token-tag); }
+.code-content :deep(.token.attr-name) { color: var(--shiki-token-attribute); }
+
+/* Line highlight for hash selection */
+:deep(.line-highlight),
+.line-highlight {
+  background: var(--accent-subtle);
+  border-radius: var(--radius-sm);
+}
+
+/* Word wrap */
+.code-content.wrap {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.code-content.wrap :deep(pre) {
+  white-space: pre-wrap;
+}
+
+/* Fallback styling */
+.fallback pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+
+.empty-file {
+  padding: var(--space-6);
+  text-align: center;
   color: var(--text-secondary);
-  margin-left: auto;
-}
-
-.header-btn:hover {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.copy-btn {
-  margin-left: auto;
-}
-
-.wrap-btn {
-  margin-left: var(--space-1);
 }
 
 /* Loading skeleton */
@@ -195,7 +212,7 @@ async function copyCode() {
 .skeleton-line-number {
   width: 30px;
   height: 14px;
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
@@ -203,94 +220,8 @@ async function copyCode() {
 .skeleton-line-content {
   flex: 1;
   height: 14px;
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
   max-width: 60%;
-}
-
-/* Code content */
-.code-content {
-  padding: var(--space-3);
-  overflow: auto; /* Enable both horizontal and vertical scroll */
-  font-size: var(--font-sm);
-  line-height: var(--line-height-code);
-  background: var(--shiki-color-background, var(--bg-secondary));
-  flex: 1;
-}
-
-.code-content :deep(pre) {
-  margin: 0;
-  background: transparent !important;
-  overflow: auto; /* Ensure scroll on pre element */
-}
-
-.code-content :deep(code) {
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
-  font-size: var(--font-sm);
-  line-height: var(--line-height-code);
-}
-
-/* Ensure Shiki tokens use CSS variables */
-.code-content :deep(.shiki) {
-  background: transparent !important;
-  overflow: auto; /* Ensure scroll on shiki element */
-}
-
-/* Shiki line numbers - make them non-selectable */
-.code-content :deep(.line-number),
-.code-content :deep([data-line-number]) {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.code-content.wrap {
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.code-content.wrap :deep(pre) {
-  white-space: pre-wrap;
-}
-
-/* Fallback line rendering */
-.fallback pre {
-  margin: 0;
-}
-
-.code-line {
-  display: flex;
-  gap: var(--space-3);
-  min-height: 1.5em;
-}
-
-.line-number {
-  color: var(--text-tertiary);
-  text-align: right;
-  min-width: 30px;
-  user-select: none; /* Line numbers are not selectable */
-  -webkit-user-select: none;
-  flex-shrink: 0;
-  position: sticky; /* Keep line numbers visible during scroll */
-  left: 0;
-  background: inherit;
-}
-
-.line-content {
-  flex: 1;
-}
-
-/* Line highlight for hash selection */
-:deep(.line-highlight),
-.line-highlight {
-  background: var(--accent-subtle);
-  border-radius: var(--radius-sm);
-  margin: 0 calc(-1 * var(--space-3));
-  padding: 0 var(--space-3);
-}
-
-.empty-file {
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--text-secondary);
 }
 </style>
