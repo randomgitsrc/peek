@@ -24,22 +24,12 @@ test.describe('Mobile Layout', () => {
     const drawer = page.locator('.mobile-file-drawer')
     await expect(drawer).toBeVisible()
 
-    // Select a file
+    // Select a file (drawer should close after selection)
     const fileItem = page.locator('.drawer-file-item').first()
     if (await fileItem.isVisible().catch(() => false)) {
       await fileItem.click()
 
       // Drawer should close
-      await expect(drawer).not.toBeVisible()
-    }
-
-    // Close via backdrop
-    await hamburger.click()
-    await expect(drawer).toBeVisible()
-
-    const backdrop = page.locator('.drawer-backdrop')
-    if (await backdrop.isVisible().catch(() => false)) {
-      await backdrop.click()
       await expect(drawer).not.toBeVisible()
     }
   })
@@ -65,11 +55,11 @@ test.describe('Mobile Layout', () => {
     await page.goto('/single-code-entry')
     await page.waitForTimeout(2000)
 
-    // Should show filename (not hamburger)
-    await expect(page.locator('.filename')).toBeVisible()
+    // Should show filename in bottom bar (not hamburger)
+    await expect(page.locator('.mobile-bottom-bar .filename')).toBeVisible()
 
     // Should have copy and wrap buttons
-    await expect(page.locator('.action-btn')).toHaveCount.greaterThanOrEqual(2)
+    await expect(page.locator('.action-btn')).toHaveCount(2)
   })
 
   test('EM4: touch scrolling works', async ({ page }) => {

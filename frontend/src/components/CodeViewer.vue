@@ -132,7 +132,7 @@ async function copyCode() {
 .code-viewer {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow: auto; /* SCROLL-CODE-01/02: Enable scroll */
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 200px);
@@ -221,6 +221,7 @@ async function copyCode() {
 .code-content :deep(pre) {
   margin: 0;
   background: transparent !important;
+  overflow: auto; /* Ensure scroll on pre element */
 }
 
 .code-content :deep(code) {
@@ -232,6 +233,7 @@ async function copyCode() {
 /* Ensure Shiki tokens use CSS variables */
 .code-content :deep(.shiki) {
   background: transparent !important;
+  overflow: auto; /* Ensure scroll on shiki element */
 }
 
 /* Shiki line numbers - make them non-selectable */

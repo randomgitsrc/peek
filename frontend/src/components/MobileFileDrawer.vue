@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="drawer">
-      <div v-if="isOpen" class="mobile-drawer-overlay" @click="close">
+      <div v-if="isOpen" class="mobile-drawer-overlay mobile-file-drawer" @click="close">
         <div class="mobile-drawer" @click.stop>
           <div class="drawer-header">
             <h3>Files</h3>
