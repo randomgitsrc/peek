@@ -5,34 +5,19 @@
         ← Back
       </router-link>
       <h2>{{ entry?.summary }}</h2>
-      <div class="header-actions">
-        <button
-          v-if="activeFile && !activeFile.is_binary"
-          class="header-btn"
-          @click="copyContent"
-        >
-          <Icon :icon="copied ? 'codicon:check' : 'codicon:copy'" class="btn-icon" />
-          {{ copied ? 'Copied!' : 'Copy' }}
-        </button>
-        <button
-          v-if="activeFile"
-          class="header-btn"
-          @click="downloadFile"
-        >
-          <Icon icon="codicon:download" class="btn-icon" />
-          Download
-        </button>
-        <button
-          v-if="activeFile && !activeFile.is_binary && !isMarkdown"
-          class="header-btn"
-          :class="{ active: wrapCode }"
-          @click="wrapCode = !wrapCode"
-          title="Toggle word wrap"
-        >
-          <Icon :icon="wrapCode ? 'codicon:word-wrap' : 'codicon:debug-continue'" class="btn-icon" />
-          Wrap
-        </button>
-        <ThemeToggle />
+      <div class="header-right desktop-only">
+        <ActionBar
+          :can-copy="canCopy"
+          :can-download="canDownload"
+          :can-wrap="canWrap"
+          :content="fileContent"
+          :filename="activeFile?.filename"
+          :wrap="wrapCode"
+          :is-mobile="false"
+          @copy="copyContent"
+          @download="downloadFile"
+          @toggle-wrap="wrapCode = !wrapCode"
+        />
       </div>
     </header>
 
@@ -177,18 +162,20 @@
       @close="tocDrawerOpen = false"
       @navigate="scrollToHeading"
     />
-    <MobileBottomBar
-      v-if="entry && !loading"
-      :active-file="activeFile"
-      :has-multiple-files="entry.files.length > 1"
-      :can-copy="!!activeFile && !activeFile.is_binary"
-      :can-download="!!activeFile"
-      :has-toc="markdownHeadings.length > 0"
-      :content="fileContent"
-      @toggle-file-drawer="fileDrawerOpen = true"
-      @toggle-toc="tocDrawerOpen = true"
-      @download="downloadFile"
-    />
+    <div class="mobile-bottom-bar mobile-only" v-if="entry">
+      <ActionBar
+        :can-copy="canCopy"
+        :can-download="canDownload"
+        :can-wrap="canWrap"
+        :content="fileContent"
+        :filename="activeFile?.filename"
+        :wrap="wrapCode"
+        :is-mobile="true"
+        @copy="copyContent"
+        @download="downloadFile"
+        @toggle-wrap="wrapCode = !wrapCode"
+      />
+    </div>
   </div>
 </template>
 
@@ -205,7 +192,7 @@ import MarkdownViewer from '../components/MarkdownViewer.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import MobileFileDrawer from '../components/MobileFileDrawer.vue'
 import MobileTocDrawer from '../components/MobileTocDrawer.vue'
-import MobileBottomBar from '../components/MobileBottomBar.vue'
+import ActionBar from '../components/ActionBar.vue'
 import type { FileResponse, TocHeading } from '../types'
 
 const route = useRoute()
@@ -225,6 +212,11 @@ const copied = ref(false)
 const wrapCode = ref(false) // WRAP-01: Wrap button state
 
 const isMarkdown = computed(() => activeFile.value?.language === 'markdown')
+
+// Computed properties for ActionBar
+const canCopy = computed(() => !!activeFile.value && !activeFile.value.is_binary)
+const canDownload = computed(() => !!activeFile.value)
+const canWrap = computed(() => !!activeFile.value && !activeFile.value.is_binary && !isMarkdown.value)
 
 const downloadUrl = computed(() =>
   activeFile.value
@@ -409,40 +401,22 @@ onMounted(doFetchEntry)
   white-space: nowrap;
 }
 
-.header-actions {
+/* Responsive utilities */
+.desktop-only {
   display: flex;
-  gap: var(--space-2);
-  align-items: center;
 }
 
-.header-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: var(--font-sm);
-  cursor: pointer;
-  transition: all 0.15s ease; /* INTER-C-03: Click transition */
+.mobile-only {
+  display: none;
 }
 
-.header-btn:hover {
-  background: var(--bg-tertiary);
-  transform: translateY(-1px); /* INTER-H-02: Button hover translateY */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* STYLE-SH-01: Button shadow */
-}
-
-.header-btn.active {
-  background: var(--accent-light);
-  color: var(--accent-color);
-  border-color: var(--accent-color);
-}
-
-.btn-icon {
-  font-size: 16px;
+@media (max-width: 1023px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: flex;
+  }
 }
 
 /* Entry content layout */
@@ -777,11 +751,6 @@ onMounted(doFetchEntry)
     width: 100%;
     flex: auto;
     font-size: var(--font-md);
-  }
-
-  .header-btn {
-    min-width: 44px; /* RESP-M-11: Touch target size */
-    min-height: 44px;
   }
 
   .entry-content {

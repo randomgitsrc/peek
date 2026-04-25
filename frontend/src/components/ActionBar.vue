@@ -68,7 +68,7 @@
         <span class="btn-label">{{ wrap ? 'Unwrap' : 'Wrap' }}</span>
       </button>
 
-      <button class="action-btn mobile theme" @click="toggleTheme">
+      <button class="action-btn mobile theme" @click="toggle">
         <Icon :icon="isDark ? 'codicon:sun' : 'codicon:moon'" />
         <span class="btn-label">{{ isDark ? 'Light' : 'Dark' }}</span>
       </button>
@@ -98,7 +98,7 @@ const emit = defineEmits<{
   toggleWrap: []
 }>()
 
-const { theme, toggleTheme } = useTheme()
+const { theme, toggle } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
 
 const copied = ref(false)
