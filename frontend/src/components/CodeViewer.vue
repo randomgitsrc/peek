@@ -59,11 +59,15 @@ async function doHighlight() {
 
   isLoading.value = true
   try {
+    console.log('[CodeViewer] Highlighting', props.language, props.content.substring(0, 50))
     highlighted.value = await highlight(
       props.content,
       props.language || 'text',
     )
-  } catch {
+    console.log('[CodeViewer] Highlighted result length:', highlighted.value.length)
+    console.log('[CodeViewer] First 200 chars:', highlighted.value.substring(0, 200))
+  } catch (err) {
+    console.error('[CodeViewer] Highlight error:', err)
     highlighted.value = ''
   } finally {
     isLoading.value = false
@@ -153,21 +157,10 @@ onMounted(() => {
   background: transparent !important;
 }
 
-/* Token colors using CSS variables */
-.code-content :deep(.token.keyword) { color: var(--shiki-token-keyword); }
-.code-content :deep(.token.string) { color: var(--shiki-token-string); }
-.code-content :deep(.token.number) { color: var(--shiki-token-number); }
-.code-content :deep(.token.comment) { color: var(--shiki-token-comment); }
-.code-content :deep(.token.function) { color: var(--shiki-token-function); }
-.code-content :deep(.token.class-name) { color: var(--shiki-token-class); }
-.code-content :deep(.token.operator) { color: var(--shiki-token-operator); }
-.code-content :deep(.token.punctuation) { color: var(--shiki-token-punctuation); }
-.code-content :deep(.token.property) { color: var(--shiki-token-property); }
-.code-content :deep(.token.variable) { color: var(--shiki-token-variable); }
-.code-content :deep(.token.constant) { color: var(--shiki-token-constant); }
-.code-content :deep(.token.builtin) { color: var(--shiki-token-builtin); }
-.code-content :deep(.token.tag) { color: var(--shiki-token-tag); }
-.code-content :deep(.token.attr-name) { color: var(--shiki-token-attribute); }
+/* Shiki css-variables theme uses inline styles with var(--shiki-token-*)
+ * Token colors are applied via CSS variables in variables.css, dark.css, light.css
+ * No additional CSS needed - Shiki generates: <span style="color: var(--shiki-token-keyword)">
+ */
 
 /* Line highlight for hash selection */
 :deep(.line-highlight),

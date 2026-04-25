@@ -1,11 +1,15 @@
 // frontend/src/composables/useShiki.ts
 
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import {
   createHighlighter,
   type Highlighter,
   type LanguageInput,
 } from 'shiki'
+
+// Import themes
+import githubDark from 'shiki/dist/themes/github-dark.mjs'
+import githubLight from 'shiki/dist/themes/github-light.mjs'
 
 /** Singleton highlighter promise — created once, reused everywhere. */
 let highlighterPromise: Promise<Highlighter> | null = null
@@ -17,12 +21,12 @@ const loadError = ref<string | null>(null)
 export function useShiki() {
   /**
    * Get or create the singleton Shiki highlighter.
-   * Created once with no pre-loaded languages — they are loaded on demand.
+   * Created once with both themes loaded.
    */
   function getHighlighter(): Promise<Highlighter> {
     if (!highlighterPromise) {
       highlighterPromise = createHighlighter({
-        themes: ['css-variables'],
+        themes: [githubDark as any, githubLight as any],
         langs: [],  // Load dynamically via loadLanguage()
       })
         .then((hl) => {
@@ -62,9 +66,15 @@ export function useShiki() {
   }
 
   /**
-   * Highlight code using CSS variables mode.
-   * Token colors are set via CSS variables (--shiki-token-*) in variables.css.
-   * This works with our data-theme attribute, unlike Shiki's dual-theme mode.
+   * Get current theme based on data-theme attribute
+   */
+  function getCurrentTheme(): string {
+    const theme = document.documentElement.getAttribute('data-theme')
+    return theme === 'light' ? 'github-light' : 'github-dark'
+  }
+
+  /**
+   * Highlight code with theme matching current mode.
    */
   async function highlight(
     code: string,
@@ -75,10 +85,11 @@ export function useShiki() {
     // Ensure language is loaded
     await loadLanguage(lang)
 
-    // Use 'css-variables' theme — tokens use var(--shiki-*) CSS variables
+    // Use theme matching current mode
+    const theme = getCurrentTheme()
     return hl.codeToHtml(code, {
       lang: hl.getLoadedLanguages().includes(lang) ? lang : 'text',
-      theme: 'css-variables',
+      theme,
     })
   }
 
