@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from 'axios'
 import type { Entry, EntryListResponse, ListEntriesParams } from '@/types'
-import type { EntryResponse, EntryListApiResponse } from './types'
+import type { EntryResponse, EntryListItemResponse, EntryListApiResponse } from './types'
 
 const API_BASE = '/api/v1'
 
@@ -29,6 +29,21 @@ class PeekAPI {
     }
   }
 
+  // Transform for list items (simplified, no files array)
+  private transformListItem(entry: EntryListItemResponse): Entry {
+    return {
+      id: entry.id,
+      slug: entry.slug,
+      summary: entry.summary,
+      tags: entry.tags,
+      status: entry.status as 'active' | 'expired',
+      files: [], // Empty array for list view
+      fileCount: entry.file_count,
+      createdAt: entry.created_at,
+    }
+  }
+
+  // Transform for detail (full with files)
   private transformEntry(entry: EntryResponse): Entry {
     return {
       id: entry.id,
@@ -53,7 +68,7 @@ class PeekAPI {
     })
 
     return {
-      items: response.data.items.map(e => this.transformEntry(e)),
+      items: response.data.items.map(e => this.transformListItem(e)),
       total: response.data.total,
       page: response.data.page,
       perPage: response.data.per_page,

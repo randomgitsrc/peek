@@ -50,7 +50,7 @@
       <aside v-if="showFileSidebar" class="file-sidebar">
         <FileTree
           :files="entryStore.currentEntry?.files || []"
-          :active-file="entryStore.activeFile"
+          :activeFileId="entryStore.activeFile?.id ?? null"
           @select="entryStore.selectFile"
         />
       </aside>
@@ -105,6 +105,7 @@
       <aside v-if="showTocSidebar" class="toc-sidebar">
         <TocNav
           :headings="tocHeadings"
+          :activeId="null"
           @select="scrollToHeading"
         />
       </aside>
@@ -155,7 +156,7 @@
       </div>
       <FileTree
         :files="entryStore.currentEntry?.files || []"
-        :active-file="entryStore.activeFile"
+        :activeFileId="entryStore.activeFile?.id ?? null"
         @select="selectFileAndCloseDrawer"
       />
     </aside>
@@ -169,6 +170,7 @@
       </div>
       <TocNav
         :headings="tocHeadings"
+        :activeId="null"
         @select="selectTocAndCloseDrawer"
       />
     </aside>

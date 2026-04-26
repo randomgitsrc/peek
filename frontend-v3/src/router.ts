@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -8,7 +8,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/EntryListView.vue'),
   },
   {
-    path: '/entry/:slug',
+    path: '/:slug',
     name: 'detail',
     component: () => import('./views/EntryDetailView.vue'),
     props: true,
@@ -16,7 +16,7 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes,
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) {

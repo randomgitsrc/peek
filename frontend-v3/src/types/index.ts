@@ -6,6 +6,7 @@ export interface Entry {
   tags: string[]
   status: 'active' | 'expired'
   files: File[]
+  fileCount?: number // For list view where files array is not populated
   createdAt: string
 }
 

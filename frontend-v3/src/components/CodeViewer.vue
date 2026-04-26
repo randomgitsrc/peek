@@ -1,22 +1,5 @@
 <template>
   <div class="code-viewer">
-    <!-- Header -->
-    <div class="code-header">
-      <span class="filename">{{ filename }}</span>
-      <span v-if="language" class="lang">{{ language }}</span>
-      <div class="actions">
-        <button class="btn btn-sm" @click="copyCode">Copy</button>
-        <button
-          v-if="canWrap"
-          class="btn btn-sm"
-          :class="{ active: wrap }"
-          @click="$emit('toggle-wrap')"
-        >
-          Wrap
-        </button>
-      </div>
-    </div>
-
     <!-- Loading -->
     <div v-if="loading" class="code-loading">
       <div v-for="i in 8" :key="i" class="code-skeleton">
@@ -28,6 +11,7 @@
     <!-- Code content -->
     <div
       v-else
+      ref="codeBodyRef"
       class="code-body"
       :class="{ 'wrap-enabled': wrap }"
       v-html="highlightedCode"
@@ -36,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { useShiki } from '@/composables/useShiki'
 import { useThemeStore } from '@/stores/theme'
 import { storeToRefs } from 'pinia'
@@ -60,8 +44,45 @@ const { theme } = storeToRefs(themeStore)
 
 const highlightedCode = ref('')
 const isHighlighting = ref(false)
+const codeBodyRef = ref<HTMLElement | null>(null)
 
 const language = computed(() => props.language || 'text')
+
+// Sync line heights between line numbers and code lines
+async function syncLineHeights() {
+  if (!codeBodyRef.value) return
+
+  await nextTick()
+
+  const lineNumbers = codeBodyRef.value.querySelectorAll('.line-number')
+  const lines = codeBodyRef.value.querySelectorAll('.line')
+
+  // Reset all line number heights first
+  lineNumbers.forEach((ln) => {
+    (ln as HTMLElement).style.height = ''
+  })
+
+  // Sync heights when wrap is enabled
+  if (props.wrap) {
+    lines.forEach((line, index) => {
+      const lineNum = lineNumbers[index]
+      if (lineNum && line) {
+        const lineHeight = line.getBoundingClientRect().height
+        ;(lineNum as HTMLElement).style.height = `${lineHeight}px`
+      }
+    })
+  }
+}
+
+// Watch for wrap changes to sync heights
+watch(() => props.wrap, () => {
+  syncLineHeights()
+})
+
+// Also sync after highlighting completes
+watch(() => highlightedCode.value, () => {
+  syncLineHeights()
+})
 
 async function doHighlight() {
   if (!props.content) {
@@ -88,14 +109,6 @@ function escapeHtml(text: string): string {
   const div = document.createElement('div')
   div.textContent = text
   return div.innerHTML
-}
-
-async function copyCode() {
-  try {
-    await navigator.clipboard.writeText(props.content)
-  } catch (err) {
-    console.error('Copy failed:', err)
-  }
 }
 
 watch(

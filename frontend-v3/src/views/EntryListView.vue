@@ -18,12 +18,12 @@
         <router-link
           v-for="entry in entries"
           :key="entry.id"
-          :to="`/entry/${entry.slug}`"
+          :to="`/${entry.slug}`"
           class="entry-card"
         >
           <h3 class="entry-title">{{ entry.summary }}</h3>
           <div class="entry-meta">
-            <span class="entry-files">{{ entry.files.length }} files</span>
+            <span class="entry-files">{{ entry.fileCount ?? entry.files?.length ?? 0 }} files</span>
             <span v-if="entry.tags.length" class="entry-tags">
               {{ entry.tags.join(', ') }}
             </span>
