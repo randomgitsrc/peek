@@ -63,8 +63,11 @@ export const useEntryStore = defineStore('entry', () => {
       const entry = await api.getEntry(slug)
       currentEntry.value = entry
 
-      // Auto-select first file if none selected and entry has files
-      if (!activeFile.value && entry.files.length > 0) {
+      // Reset active file when entry changes, then auto-select first file
+      activeFile.value = null
+      fileContent.value = ''
+
+      if (entry.files.length > 0) {
         await selectFile(entry.files[0])
       }
     } catch (err) {
