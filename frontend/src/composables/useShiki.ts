@@ -89,6 +89,15 @@ export function useShiki() {
   }
 
   /**
+   * Generate line numbers HTML
+   */
+  function renderLineNumbers(code: string): string {
+    const lines = code.split('\n')
+    const lineNumbers = lines.map((_, i) => `<span class="line-number">${i + 1}</span>`).join('\n')
+    return `<div class="line-numbers" aria-hidden="true">${lineNumbers}</div>`
+  }
+
+  /**
    * Highlight code with theme matching current mode.
    */
   async function highlight(code: string, lang: string): Promise<string> {
@@ -99,7 +108,11 @@ export function useShiki() {
     const loadedLangs = hl.getLoadedLanguages()
     const useLang = loadedLangs.includes(lang) ? lang : 'text'
 
-    return hl.codeToHtml(code, { lang: useLang, theme })
+    const html = hl.codeToHtml(code, { lang: useLang, theme })
+
+    // Wrap with line numbers
+    const lineNumbersHtml = renderLineNumbers(code)
+    return `<div class="code-container">${lineNumbersHtml}${html}</div>`
   }
 
   return { getHighlighter, loadLanguage, highlight, isReady, loadError }
