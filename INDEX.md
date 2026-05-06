@@ -217,6 +217,7 @@ v2 计划已包含以下修订：
 | Commit | 说明 | 日期 |
 |--------|------|------|
 | `f3a49f9` | fix: Mermaid图表容器和切换修复 (v0.1.17) | 2026-05-06 |
+| `1da0aa1` | fix: 动态高度计算和静态文件路径修复 | 2026-05-06 |
 | `193cfbd` | auto sync: 前端 Task 16b/16c 核心组件 | 2026-04-23 |
 | `0c9ff3c` | feat(frontend): Task 15 - UI Components | 2026-04-23 |
 | `240113e` | feat(frontend): Task 14 - Vue 3 + Vite | 2026-04-22 |
