@@ -1,160 +1,110 @@
 # 发布流程
 
-## 项目结构说明
+> 本文档定义 PeekView 的标准发布流程
 
-```
-peekview/                    # 项目根目录
-├── frontend-v3/            # Vue3 前端
-│   ├── src/                 # 源代码
-│   └── dist/                # 构建输出
-├── backend/                  # Python 后端
-│   ├── peekview/            # Python 包
-│   │   └── static/          # 前端静态文件（从前端构建复制）
-│   └── pyproject.toml       # Python 包配置
-└── Makefile                 # 根级构建脚本（统一入口）
-```
-
-**关键理解：**
-- 前端构建输出必须复制到 `backend/peekview/static/` 才会被打包进 PyPI
-- 后端打包工具（hatchling）只打包 `backend/` 目录下的文件
-- **根级 Makefile** 是统一入口，确保"先构建前端 → 复制 → 再打包后端"
-
----
-
-## 推荐发布流程（使用根级 Makefile）
-
-### 1. 完整构建（开发测试）
+## 快速发布（一句话）
 
 ```bash
-cd /home/kity/lab/projects/peekview  # 项目根目录
-
-# 构建前端 + 复制到后端 + 打包后端
-make build
-
-# 本地安装测试
-make install
-
-# 启动测试
-peekview serve
+make publish && git tag -a v$(cd backend && python3 -c "from peekview import __version__; print(__version__)") -m "Release" && git push origin --tags
 ```
 
-### 2. 完整发布到 PyPI
+## 标准发布流程
+
+### 前提条件
+
+- PyPI API Token 已设置环境变量：`export PYPI_API_TOKEN=your_token`
+- 所有代码改动已提交到 main 分支
+- 版本号已在以下文件更新：
+  - `backend/peekview/__init__.py`
+  - `backend/pyproject.toml`
+  - `frontend-v3/package.json`
+  - `CHANGELOG.md`
+  - `INDEX.md`
+
+### 发布步骤
 
 ```bash
+# 1. 进入项目根目录
 cd /home/kity/lab/projects/peekview
 
-# 设置环境变量
-export PYPI_API_TOKEN="pypi-xxxxx"
-
-# 一键发布（构建 → 测试 → 版本检查 → 上传）
+# 2. 执行完整发布（构建 + 检查 + 上传 PyPI）
 make publish
+
+# 3. 创建并推送 Git Tag（Makefile 不包含此步骤，需手动）
+VERSION=$(cd backend && python3 -c "from peekview import __version__; print(__version__)")
+git tag -a "v$VERSION" -m "Release v$VERSION"
+git push origin "v$VERSION"
 ```
 
-### 3. 发布到 TestPyPI（测试）
+### 发布后验证
 
 ```bash
-export PYPI_TEST_API_TOKEN="pypi-xxxxx"
-make publish-test
-```
-
----
-
-## 单独操作（高级/调试）
-
-### 仅构建前端
-```bash
-make build-frontend
-# 输出到 frontend-v3/dist/
-```
-
-### 仅构建后端（⚠️ 不包含新鲜前端）
-```bash
-cd backend
-make build-dist
-```
-
-### 仅复制已构建的前端
-```bash
-# 手动复制（如果前端已构建）
-rm -rf backend/peekview/static/*
-cp -r frontend-v3/dist/* backend/peekview/static/
-```
-
----
-
-## 版本更新检查清单
-
-发布前确认：
-- [ ] `backend/pyproject.toml` 中的 version 已更新
-- [ ] `backend/peekview/__init__.py` 中的 `__version__` 已更新（其他文件通过导入使用）
-- [ ] `frontend-v3/package.json` 中的 version 已更新
-- [ ] `CHANGELOG.md` 已记录本次变更
-- [ ] 在**项目根目录**运行 `make build`（确保静态文件最新）
-- [ ] 运行 `make test` 通过所有测试
-- [ ] 运行 `make check-version` 通过版本一致性检查
-
----
-
-## 版本号规范
-
-**单一数据源原则：** 版本号只在 `peekview/__init__.py` 定义一次，其他文件通过导入使用。
-
-```python
-# ✅ 正确做法
-from peekview import __version__
-
-# ❌ 错误做法（已修复）
-version = "0.1.12"  # 不要硬编码
-```
-
-### 文件变更
-
-- `backend/pyproject.toml`: `version = "0.1.12"`（打包时使用）
-- `backend/peekview/__init__.py`: `__version__ = "0.1.12"`（单一数据源）
-- `backend/peekview/cli.py`: `from peekview import __version__`
-- `backend/peekview/main.py`: `from peekview import __version__`
-- `frontend-v3/package.json`: `"version": "0.1.12"`
-
----
-
-## 常见错误
-
-### ❌ 错误：在后端目录直接 publish
-```bash
-cd backend
-make publish   # 这会打包旧的前端静态文件！
-```
-
-### ✅ 正确：在根目录 publish
-```bash
-cd /home/kity/lab/projects/peekview  # 回到根目录
-make publish                           # 先构建前端再发布
-```
-
-### ❌ 错误：修改了前端但没重新构建
-```bash
-# 修改了 useMarkdown.ts 但没构建
-make publish  # 静态文件还是旧的
-```
-
-### ✅ 正确：确保完整构建
-```bash
-make build    # 包含 npm run build + copy + python build
-```
-
----
-
-## 发布后验证
-
-```bash
-# 等待 PyPI 索引更新（约 1-5 分钟）
+# 1. 检查 PyPI
 pip index versions peekview
 
-# 安装测试
-pipx install peekview --force
-peekview --version
+# 2. 检查 GitHub Tags
+open https://github.com/randomgitsrc/peekview/releases
 
-# 验证 mermaid 等功能正常
-peekview serve
-# 浏览器访问包含 mermaid 图表的 entry
+# 3. 测试安装
+pipx upgrade peekview
+peekview --version
 ```
+
+## Makefile 命令速查
+
+| 命令 | 作用 |
+|------|------|
+| `make build` | 构建前后端 |
+| `make test` | 运行测试 |
+| `make pre-publish` | 发布前检查（不实际发布） |
+| `make publish` | 发布到 PyPI |
+| `make publish-test` | 发布到 TestPyPI |
+| `make clean` | 清理构建产物 |
+
+查看完整帮助：`make help`
+
+## 常见问题
+
+### 1. 忘记设置 PYPI_API_TOKEN
+
+```bash
+export PYPI_API_TOKEN=pypi-xxxxx
+```
+
+### 2. 版本号不一致
+
+```bash
+make check-version
+```
+
+### 3. CHANGELOG 未更新
+
+```bash
+make check-changelog
+```
+
+### 4. 只想测试发布流程（不上传）
+
+```bash
+make pre-publish
+```
+
+## 自动化建议
+
+### 方案 1：GitHub Actions（推荐）
+
+创建 `.github/workflows/release.yml`，实现：
+- push tag 时自动发布到 PyPI
+- 自动创建 GitHub Release
+- 自动上传构建产物
+
+### 方案 2：Makefile 增强
+
+在 Makefile 中添加 `publish-full` 目标，包含 tag 创建和推送。
+
+---
+
+**记住**：
+1. 发布前先看 `make pre-publish` 是否通过
+2. 版本号必须先在 5 个文件中更新
+3. 发布后必须打 tag 并推送
