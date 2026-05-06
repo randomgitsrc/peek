@@ -4,36 +4,39 @@
     <header class="detail-header">
       <span class="back-btn" @click="goBack" title="Back to list">&larr;</span>
       <h1 class="title">{{ entryTitle }}</h1>
-      <div class="actions" v-if="entryStore.currentEntry">
-        <button
-          v-if="entryStore.canWrap"
-          class="btn btn-sm"
-          :class="{ active: entryStore.wrapEnabled }"
-          @click="entryStore.toggleWrap()"
-        >
-          Wrap
-        </button>
-        <button
-          v-if="entryStore.canCopy"
-          class="btn btn-sm"
-          @click="copyContent"
-        >
-          Copy
-        </button>
-        <button
-          v-if="entryStore.canDownload"
-          class="btn btn-sm"
-          @click="downloadFile"
-        >
-          Download
-        </button>
-        <button
-          v-if="entryStore.canPack && entryStore.currentEntry"
-          class="btn btn-sm"
-          @click="downloadPack"
-        >
-          Pack
-        </button>
+      <div class="header-right">
+        <div class="actions" v-if="entryStore.currentEntry">
+          <button
+            v-if="entryStore.canWrap"
+            class="btn btn-sm"
+            :class="{ active: entryStore.wrapEnabled }"
+            @click="entryStore.toggleWrap()"
+          >
+            Wrap
+          </button>
+          <button
+            v-if="entryStore.canCopy"
+            class="btn btn-sm"
+            @click="copyContent"
+          >
+            Copy
+          </button>
+          <button
+            v-if="entryStore.canDownload"
+            class="btn btn-sm"
+            @click="downloadFile"
+          >
+            Download
+          </button>
+          <button
+            v-if="entryStore.canPack && entryStore.currentEntry"
+            class="btn btn-sm"
+            @click="downloadPack"
+          >
+            Pack
+          </button>
+        </div>
+        <ThemeToggle />
       </div>
       <button
         v-if="showTocButton"
@@ -186,6 +189,7 @@ import CodeViewer from '@/components/CodeViewer.vue'
 import MarkdownViewer from '@/components/MarkdownViewer.vue'
 import FileTree from '@/components/FileTree.vue'
 import TocNav from '@/components/TocNav.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import type { TocHeading } from '@/types'
 
 const props = defineProps<{
