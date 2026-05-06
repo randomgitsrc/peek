@@ -743,14 +743,18 @@ watch(() => [props.content, theme.value], async () => {
 /* Content areas */
 .mermaid-content {
   position: relative;
-  /* Default height, can be resized by user */
+  /* Default height - will be adjusted by content via aspect-ratio */
   min-height: 300px;
-  height: 300px;
+  height: auto;
+  /* Use aspect-ratio based on typical diagram proportions */
+  aspect-ratio: 16 / 9;
 }
 
 .mermaid-content.diagram-mode {
   background: var(--bg-secondary);
   overflow: hidden;
+  /* Ensure minimum height */
+  min-height: 300px;
 }
 
 .mermaid-content.code-mode {
@@ -758,6 +762,8 @@ watch(() => [props.content, theme.value], async () => {
   display: none;
   height: auto;
   min-height: 100px;
+  /* Reset aspect-ratio for code view */
+  aspect-ratio: auto;
 }
 
 .mermaid-content.code-mode pre {
