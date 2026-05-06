@@ -40,6 +40,12 @@
         />
       </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="list-footer">
+      <span class="version">v{{ appVersion }}</span>
+      <span class="copyright">© 2026 PeekView</span>
+    </footer>
   </div>
 </template>
 
@@ -49,6 +55,9 @@ import { useEntryStore } from '@/stores/entry'
 import { storeToRefs } from 'pinia'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import Pagination from '@/components/Pagination.vue'
+
+// App version from package.json
+const appVersion = ref('0.1.19')
 
 const store = useEntryStore()
 const { entries, loading, error, total, page, perPage } = storeToRefs(store)
@@ -76,10 +85,10 @@ import { computed } from 'vue'
 </script>
 
 <style scoped>
-.entry-list { min-height: 100vh; background: var(--bg-primary); }
-.list-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4); border-bottom: 1px solid var(--border-color); }
+.entry-list { min-height: 100vh; background: var(--bg-primary); display: flex; flex-direction: column; }
+.list-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4); border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
 .list-header h1 { font-size: var(--font-xl); font-weight: 700; }
-.list-content { padding: var(--space-4); max-width: 1200px; margin: 0 auto; }
+.list-content { padding: var(--space-4); max-width: 1200px; margin: 0 auto; width: 100%; flex: 1; }
 .loading, .error, .empty { text-align: center; padding: var(--space-7); color: var(--text-secondary); }
 .error { color: var(--error-color); }
 .entry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
@@ -88,4 +97,9 @@ import { computed } from 'vue'
 .entry-title { font-size: var(--font-md); font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-2); }
 .entry-meta { display: flex; gap: var(--space-3); font-size: var(--font-sm); color: var(--text-secondary); }
 .entry-tags { color: var(--accent-color); }
+
+/* Footer */
+.list-footer { display: flex; align-items: center; justify-content: center; gap: var(--space-4); padding: var(--space-3); border-top: 1px solid var(--border-color); font-size: var(--font-xs); color: var(--text-tertiary); flex-shrink: 0; }
+.list-footer .version { font-family: var(--font-mono); }
+.list-footer .copyright { opacity: 0.8; }
 </style>
