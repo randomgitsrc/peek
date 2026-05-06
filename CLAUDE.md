@@ -273,3 +273,33 @@ This project follows a checkpoint-driven development workflow defined in `docs/p
 5. **P4: Consistency** - Verify code, tests, and docs are aligned
 
 **Always read `docs/process/workflow.md` before starting new work.**
+
+## Debug Workflow (CRITICAL!)
+
+> ⚠️ **下次调试前必须阅读**: `docs/process/debug-workflow.md`
+
+**标准调试命令（必须遵循）**:
+```bash
+# 一键完整调试（推荐）
+make debug
+
+# 或分步执行
+make debug-build   # 1. 构建并验证 static 文件
+make debug-start   # 2. 启动调试服务（:8888，与 pipx 服务隔离）
+make debug-test    # 3. 运行 E2E 测试
+# 4. 用户人工验证 http://127.0.0.1:8888
+make debug-stop    # 5. 停止调试服务
+```
+
+**关键检查点**:
+- [ ] `make debug-build` 后检查 `static/index.html` 时间戳是否最新
+- [ ] E2E 测试通过后才能进入发布流程
+- [ ] 用户确认"没问题"后才能 `make publish`
+
+**严禁**:
+- ❌ 直接手动启动 uvicorn（容易用错端口或数据目录）
+- ❌ 跳过 E2E 测试直接发布
+- ❌ 停止用户的 pipx 正式服务（:8080）
+
+**经验教训**: `docs/process/debug-lessons.md`
+

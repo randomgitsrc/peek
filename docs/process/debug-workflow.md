@@ -12,14 +12,22 @@
 ## 快速开始
 
 ```bash
-# 一键启动调试（构建 + 启动服务 + 运行 E2E 测试）
+# 一键完整调试（推荐）
 make debug
 
-# 或分步执行
-make debug-build    # 步骤1: 构建并检查
-make debug-start    # 步骤2: 启动调试服务
-make debug-test     # 步骤3: 运行 E2E 测试
+# 或分步执行（推荐用于问题排查）
+make debug-build    # 步骤1: 构建并检查 static 文件
+make debug-start    # 步骤2: 启动调试服务 (:8888)
+make debug-test     # 步骤3: 运行 E2E 测试（自动创建测试数据）
+# 步骤4: 用户人工验证 http://127.0.0.1:8888
+make debug-stop     # 步骤5: 停止调试服务
 ```
+
+**⚠️ 重要: E2E 测试必须手动触发**
+- `make debug` 包含 `debug-test`
+- 但 **E2E 测试必须在服务启动后运行**
+- 如果单独运行 `make debug-start`，稍后需要手动运行 `make debug-test`
+- **严禁跳过 E2E 直接发布！**
 
 ## 详细流程
 
@@ -66,26 +74,41 @@ PEEKVIEW_DB_PATH=/tmp/peekview-debug/peek.db \
 ### 步骤 3: E2E 测试
 
 ```bash
-# 运行完整 E2E 测试（Mermaid + 分页器 + 核心功能）
+# 运行完整 E2E 测试（自动创建测试数据，测试核心功能）
 make debug-test
-
-# 或单独测试 Mermaid
-npx playwright test e2e/mermaid-full-test.ts
-
-# 或带 UI 调试
-npx playwright test --ui
 ```
 
-**必须通过的测试**:
-- [ ] `mermaid-full-test.ts` - SVG 填满容器、切换不丢失、Fullscreen 正常
-- [ ] `pagination.spec.ts` - 页码跳转、快速跳转输入框
-- [ ] `viewer.spec.ts` - 代码高亮、Markdown 渲染
+**测试内容** (e2e/debug-server.spec.ts):
+- ✅ 服务健康检查
+- ✅ 代码条目创建和查看
+- ✅ **Mermaid 图表渲染和填满容器**
+- ✅ **Mermaid Code/Diagram 切换不丢失**
+- ✅ **Mermaid Fullscreen 铺满窗口**
+- ✅ **分页器页码显示和跳转**
+- ✅ 主题切换
+- ✅ 移动端布局
+
+**测试结果位置**:
+- 截图: `/tmp/e2e-results/*.png`
+- Playwright 报告: `frontend-v3/playwright-report/`
+
+**如果测试失败**:
+```bash
+# 查看失败截图
+ls -la /tmp/e2e-results/
+
+# 带 UI 模式运行（可手动查看）
+cd frontend-v3
+BASE_URL=http://127.0.0.1:8888 npx playwright test --ui
+```
 
 ### 步骤 4: 用户验证
 
-1. 访问 `http://127.0.0.1:8888/entries/demo` 或创建的测试条目
+1. 访问 `http://127.0.0.1:8888/entries/demo` 或测试创建的条目
 2. 验证修改的功能点
 3. 用户确认 **"没问题"** 后，进入发布流程
+
+**注意**: E2E 测试通过 ≠ 用户体验 OK，必须人工确认！
 
 ### 步骤 5: 清理与发布
 

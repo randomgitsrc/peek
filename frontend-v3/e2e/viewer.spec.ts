@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test'
 
-const BASE_URL = 'http://localhost:5173'
-
 // Helper: Wait for Shiki to load
 async function waitForShiki(page) {
   await page.waitForFunction(() => {
@@ -20,7 +18,19 @@ async function getColoredTokens(page) {
 
 test.describe('Code Viewer', () => {
   test('TC-001: Python code syntax highlighting', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    // 创建测试条目
+    await page.request.post('/api/v1/entries', {
+      data: {
+        slug: 'e2e-test-code',
+        summary: 'E2E Test Code',
+        files: [{
+          filename: 'test.py',
+          content: 'def hello():\n    print("Hello World")\n    return 42'
+        }]
+      }
+    })
+
+    await page.goto('/#/entry/e2e-test-code')
     await waitForShiki(page)
 
     // Check for colored tokens (Shiki generates spans with color styles)
@@ -32,7 +42,7 @@ test.describe('Code Viewer', () => {
   })
 
   test('TC-002: Line numbers displayed', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto('/#/entry/e2e-test-code')
     await waitForShiki(page)
 
     // Shiki's output should have line structure
@@ -41,7 +51,7 @@ test.describe('Code Viewer', () => {
   })
 
   test('TC-003: Wrap mode toggle', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto('/#/entry/e2e-test-code')
     await waitForShiki(page)
 
     // Initial state - no wrap
@@ -59,7 +69,7 @@ test.describe('Code Viewer', () => {
   })
 
   test('TC-004: Copy button copies code', async ({ page, context }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto(`/#/entry/lu4prg`)
     await waitForShiki(page)
 
     // Grant clipboard permissions
@@ -74,7 +84,7 @@ test.describe('Code Viewer', () => {
   })
 
   test('TC-005: Code block header displays correctly', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto(`/#/entry/lu4prg`)
     await waitForShiki(page)
 
     // Check header elements
@@ -92,7 +102,7 @@ test.describe('Code Viewer', () => {
 test.describe('Markdown Viewer', () => {
   test('TC-010: Markdown basic rendering', async ({ page }) => {
     // Navigate to markdown entry
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
 
     // Wait for content
     await page.waitForSelector('.markdown-body', { timeout: 5000 })
@@ -105,7 +115,7 @@ test.describe('Markdown Viewer', () => {
   })
 
   test('TC-011: TOC sidebar displayed', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
     await page.waitForSelector('.markdown-body', { timeout: 5000 })
 
     // Check TOC exists on desktop
@@ -114,7 +124,7 @@ test.describe('Markdown Viewer', () => {
   })
 
   test('TC-012: TOC navigation works', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
     await page.waitForSelector('.toc-nav', { timeout: 5000 })
 
     // Click first TOC item
@@ -128,7 +138,7 @@ test.describe('Markdown Viewer', () => {
 
   test('TC-013: Mermaid diagram rendering', async ({ page }) => {
     // This test requires an entry with mermaid diagram
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
     await page.waitForTimeout(3000)
 
     // Check for mermaid container or SVG
@@ -146,7 +156,7 @@ test.describe('Markdown Viewer', () => {
 test.describe('Responsive Layout', () => {
   test('TC-020: Desktop 3-column layout', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 })
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
 
     // Check file sidebar visible on desktop
     await expect(page.locator('.file-sidebar')).toBeVisible()
@@ -159,7 +169,7 @@ test.describe('Responsive Layout', () => {
 
   test('TC-021: Mobile single column layout', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
 
     // Sidebars should be hidden on mobile
     await expect(page.locator('.file-sidebar')).not.toBeVisible()
@@ -173,7 +183,7 @@ test.describe('Responsive Layout', () => {
 
   test('TC-022: Mobile file drawer', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
 
     // Click menu button
     await page.click('.mobile-actions .menu-btn')
@@ -188,7 +198,7 @@ test.describe('Responsive Layout', () => {
 
   test('TC-023: Mobile TOC drawer', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
 
     // Click TOC button in header
     await page.click('.toc-btn')
@@ -204,7 +214,7 @@ test.describe('Responsive Layout', () => {
 
 test.describe('Theme Switching', () => {
   test('TC-030: Dark/light theme toggle', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto(`/#/entry/lu4prg`)
     await waitForShiki(page)
 
     // Get initial theme
@@ -226,7 +236,7 @@ test.describe('Theme Switching', () => {
   })
 
   test('TC-031: Theme persistence after reload', async ({ page }) => {
-    await page.goto(`${BASE_URL}/`)
+    await page.goto(`/`)
 
     // Toggle theme
     await page.click('.list-header .btn-icon')
@@ -251,7 +261,7 @@ test.describe('Theme Switching', () => {
 
 test.describe('File Operations', () => {
   test('TC-040: File selection', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/ngajri`)
+    await page.goto(`/#/entry/ngajri`)
 
     // Click second file in tree
     const files = page.locator('.file-item')
@@ -263,7 +273,7 @@ test.describe('File Operations', () => {
 
   test('TC-041: Single file hides file tree', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 })
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto(`/#/entry/lu4prg`)
 
     // Single file entry should not show file sidebar
     const fileSidebar = page.locator('.file-sidebar')
@@ -272,7 +282,7 @@ test.describe('File Operations', () => {
   })
 
   test('TC-042: Download button exists', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/entry/lu4prg`)
+    await page.goto(`/#/entry/lu4prg`)
     await waitForShiki(page)
 
     // Check download link exists
@@ -287,7 +297,7 @@ test.describe('File Operations', () => {
 
 test.describe('Entry List', () => {
   test('TC-050: Entry list displays correctly', async ({ page }) => {
-    await page.goto(`${BASE_URL}/`)
+    await page.goto(`/`)
 
     // Wait for entries to load
     await page.waitForSelector('.entry-card', { timeout: 10000 })
