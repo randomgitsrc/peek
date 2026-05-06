@@ -1,6 +1,7 @@
 # PeekView — 项目索引
 
-> 最后更新：2026-04-24  
+> 最后更新：2026-05-06  
+> 当前版本：v0.1.17
 > 工作计划：[docs/plans/work-plan.md](docs/plans/work-plan.md)
 
 ---
@@ -196,7 +197,7 @@ frontend-v3/src/
 - ❌ 更新条目（可用删除+重建替代）
 - ❌ MCP Server（P1 实现）
 - ❌ 过期自动清理（P1 实现）
-- ❌ Mermaid 图表渲染（P2 实现）
+- ✅ ~~Mermaid 图表渲染~~（v0.1.16 已实现，v0.1.17 修复容器问题）
 - ❌ 嵌入式分享 iframe（P1 实现）
 
 ---
@@ -215,6 +216,7 @@ v2 计划已包含以下修订：
 
 | Commit | 说明 | 日期 |
 |--------|------|------|
+| `f3a49f9` | fix: Mermaid图表容器和切换修复 (v0.1.17) | 2026-05-06 |
 | `193cfbd` | auto sync: 前端 Task 16b/16c 核心组件 | 2026-04-23 |
 | `0c9ff3c` | feat(frontend): Task 15 - UI Components | 2026-04-23 |
 | `240113e` | feat(frontend): Task 14 - Vue 3 + Vite | 2026-04-22 |
