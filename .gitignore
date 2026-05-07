@@ -48,3 +48,6 @@ connect_cdp.py
 
 # Node.js (if accidentally committed from frontend)
 node_modules/
+ffmpeg
+ffmpeg-master-latest-linux64-gpl/
+ffmpeg.tar.xz
