@@ -158,12 +158,26 @@ cat ~/.peekview/config.yaml  # 如存在
 #### 4. 环境变量配置
 
 ```bash
-# 开发时常用的环境变量
-export PEEKVIEW_DATA_DIR=/tmp/peekview/data
-export PEEKVIEW_DB_PATH=/tmp/peekview/peek.db
-export PEEKVIEW_PORT=8080
-export PEEKVIEW_HOST=127.0.0.1
-export PEEKVIEW_CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
+# 开发时常用的环境变量（注意 __ 分隔符用于嵌套配置）
+export PEEKVIEW_STORAGE__DATA_DIR=/tmp/peekview/data
+export PEEKVIEW_STORAGE__DB_PATH=/tmp/peekview/peek.db
+export PEEKVIEW_SERVER__PORT=8080
+export PEEKVIEW_SERVER__HOST=127.0.0.1
+export PEEKVIEW_SERVER__CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
+```
+
+或使用 config.yaml：
+```bash
+# ~/.peekview/config.yaml
+cleanup:
+  check_on_start: true
+  interval_seconds: 600
+server:
+  host: 127.0.0.1
+  port: 8080
+storage:
+  data_dir: /tmp/peekview/data
+  db_path: /tmp/peekview/peek.db
 ```
 
 ---
@@ -298,10 +312,10 @@ cd backend && source .venv/bin/activate
 **解决**：
 ```bash
 # 确保后端允许前端域名
-export PEEKVIEW_CORS_ORIGINS="http://localhost:5173"
+export PEEKVIEW_SERVER__CORS_ORIGINS="http://localhost:5173"
 
 # 或使用通配符（仅开发环境）
-export PEEKVIEW_CORS_ORIGINS="*"
+export PEEKVIEW_SERVER__CORS_ORIGINS="*"
 ```
 
 ### Q3: 热重载不生效

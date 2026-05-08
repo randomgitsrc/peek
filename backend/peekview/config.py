@@ -184,10 +184,12 @@ class PeekConfig(BaseSettings):
     """Main configuration class.
 
     Combines all configuration sections. Values can be set via:
-    1. Environment variables (PEEKVIEW_HOST, PEEKVIEW_DATA_DIR, etc.) - highest priority
+    1. Environment variables (PEEKVIEW_SERVER__HOST, PEEKVIEW_STORAGE__DATA_DIR, etc.) - highest priority
     2. Constructor arguments
     3. Config file (~/.peekview/config.yaml)
     4. Default values - lowest priority
+
+    Note: Use __ separator for nested config (e.g., storage.data_dir -> PEEKVIEW_STORAGE__DATA_DIR)
     """
 
     model_config = SettingsConfigDict(

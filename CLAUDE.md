@@ -148,7 +148,7 @@ peekview delete my-entry          # Delete (with confirmation)
 1. **local_path allowlist** (not blacklist): Only paths under configured allowed directories permitted (see `config.is_local_path_allowed()`)
 2. **Symlink check BEFORE resolve**: Check `original.is_symlink()` before `original.resolve()` (in `file_service.validate_local_path()`)
 3. **Path traversal on `files.path`**: After computing `base / file_path`, verify resolved path starts with `base.resolve()` (in `storage.py`)
-4. **API Key auth**: `Authorization: Bearer <token>` header required when `PEEKVIEW_API_KEY` env var set
+4. **API Key auth**: `Authorization: Bearer <token>` header required when `PEEKVIEW_SERVER__API_KEY` env var set
 5. **XSS protection**: `sanitize-html` used in frontend (MarkdownViewer.vue)
 
 ### File Upload Modes
@@ -207,13 +207,15 @@ entry_service = get_entry_service(request.app)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PEEKVIEW_DATA_DIR` | `~/.peekview/data` | File storage directory |
-| `PEEKVIEW_DB_PATH` | `~/.peekview/peek.db` | SQLite database path |
-| `PEEKVIEW_ALLOWED_PATHS` | `[]` | Allowlist for local_path reads |
-| `PEEKVIEW_HOST` | `127.0.0.1` | Server bind address |
-| `PEEKVIEW_PORT` | `8080` | Server port |
-| `PEEKVIEW_API_KEY` | `""` | API key for auth (empty = no auth) |
-| `PEEKVIEW_CORS_ORIGINS` | `http://localhost:5173` | CORS allowed origins |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | File storage directory |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite database path |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | Allowlist for local_path reads |
+| `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | Server bind address |
+| `PEEKVIEW_SERVER__PORT` | `8080` | Server port |
+| `PEEKVIEW_SERVER__API_KEY` | `""` | API key for auth (empty = no auth) |
+| `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS allowed origins |
+
+**Note**: Use `__` separator for nested config (e.g., `storage.data_dir` → `PEEKVIEW_STORAGE__DATA_DIR`)
 
 ## Implementation Status
 

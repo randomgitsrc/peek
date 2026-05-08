@@ -43,10 +43,10 @@ ls backend/peekview/static/ | wc -l
 PORT=8888
 DATA_DIR=/tmp/peekview-debug  # 隔离数据
 
-# 启动命令
+# 启动命令（注意 __ 分隔符）
 cd backend
-PEEKVIEW_DATA_DIR=/tmp/peekview-debug/data \
-PEEKVIEW_DB_PATH=/tmp/peekview-debug/peek.db \
+PEEKVIEW_STORAGE__DATA_DIR=/tmp/peekview-debug/data \
+PEEKVIEW_STORAGE__DB_PATH=/tmp/peekview-debug/peek.db \
   uvicorn peekview.main:get_app --host 127.0.0.1 --port 8888 --factory
 ```
 

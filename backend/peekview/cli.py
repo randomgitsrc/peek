@@ -519,11 +519,11 @@ def _install_systemd_service(user_mode: bool, host: str | None, port: int | None
     if base_url:
         env_vars.append(f"Environment=PEEKVIEW_SERVER__BASE_URL={base_url}")
     if host:
-        env_vars.append(f"Environment=PEEKVIEW_HOST={host}")
+        env_vars.append(f"Environment=PEEKVIEW_SERVER__HOST={host}")
     if port:
-        env_vars.append(f"Environment=PEEKVIEW_PORT={port}")
+        env_vars.append(f"Environment=PEEKVIEW_SERVER__PORT={port}")
     if data_dir:
-        env_vars.append(f"Environment=PEEKVIEW_DATA_DIR={data_dir}")
+        env_vars.append(f"Environment=PEEKVIEW_STORAGE__DATA_DIR={data_dir}")
 
     # Get current user for service file
     current_user = getpass.getuser()
@@ -593,11 +593,11 @@ def _install_launchd_service(user_mode: bool, host: str | None, port: int | None
     if base_url:
         env_vars["PEEKVIEW_SERVER__BASE_URL"] = base_url
     if host:
-        env_vars["PEEKVIEW_HOST"] = host
+        env_vars["PEEKVIEW_SERVER__HOST"] = host
     if port:
-        env_vars["PEEKVIEW_PORT"] = str(port)
+        env_vars["PEEKVIEW_SERVER__PORT"] = str(port)
     if data_dir:
-        env_vars["PEEKVIEW_DATA_DIR"] = data_dir
+        env_vars["PEEKVIEW_STORAGE__DATA_DIR"] = data_dir
 
     # Create plist content
     env_xml = ""

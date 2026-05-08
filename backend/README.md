@@ -71,28 +71,42 @@ peekview delete my-entry --force
 
 ## 配置
 
-通过环境变量配置：
+### 环境变量
+
+通过环境变量配置（注意 `__` 分隔符用于嵌套配置）：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PEEKVIEW_DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
-| `PEEKVIEW_DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 |
-| `PEEKVIEW_ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
-| `PEEKVIEW_HOST` | `127.0.0.1` | 服务绑定地址 |
-| `PEEKVIEW_PORT` | `8080` | 服务端口 |
-| `PEEKVIEW_API_KEY` | `` | API 认证密钥（可选） |
-| `PEEKVIEW_CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
+| `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | 服务绑定地址 |
+| `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 |
+| `PEEKVIEW_SERVER__API_KEY` | `` | API 认证密钥（可选） |
+| `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
 
 ### 配置文件
 
-也可以将配置写入 `.env` 文件：
+推荐将配置写入 `~/.peekview/config.yaml`：
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 8080
+  base_url: https://peek.example.com
+storage:
+  data_dir: /var/peekview/data
+  db_path: /var/peekview/peek.db
+```
+
+或使用 `.env` 文件（Docker/临时配置）：
 
 ```bash
-PEEKVIEW_DATA_DIR=/var/peekview/data
-PEEKVIEW_DB_PATH=/var/peekview/peekview.db
-PEEKVIEW_HOST=0.0.0.0
-PEEKVIEW_PORT=8080
-PEEKVIEW_API_KEY=your-secret-key
+PEEKVIEW_STORAGE__DATA_DIR=/var/peekview/data
+PEEKVIEW_STORAGE__DB_PATH=/var/peekview/peek.db
+PEEKVIEW_SERVER__HOST=0.0.0.0
+PEEKVIEW_SERVER__PORT=8080
+PEEKVIEW_SERVER__API_KEY=your-secret-key
 ```
 
 ## 特性

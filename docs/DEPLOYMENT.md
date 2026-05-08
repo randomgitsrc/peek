@@ -210,10 +210,10 @@ After=network.target
 Type=simple
 User=www-data
 WorkingDirectory=/opt/peek
-Environment=PEEKVIEW_DATA_DIR=/var/peek/data
-Environment=PEEKVIEW_DB_PATH=/var/peek/peek.db
-Environment=PEEKVIEW_HOST=0.0.0.0
-Environment=PEEKVIEW_PORT=8080
+Environment=PEEKVIEW_STORAGE__DATA_DIR=/var/peek/data
+Environment=PEEKVIEW_STORAGE__DB_PATH=/var/peek/peek.db
+Environment=PEEKVIEW_SERVER__HOST=0.0.0.0
+Environment=PEEKVIEW_SERVER__PORT=8080
 ExecStart=/opt/peek/venv/bin/peekview serve
 Restart=always
 RestartSec=5
@@ -269,33 +269,49 @@ server {
 
 | 变量 | 默认值 | 说明 | 示例 |
 |------|--------|------|------|
-| `PEEKVIEW_DATA_DIR` | `~/.peekview/data` | 文件存储目录 | `/var/peek/data` |
-| `PEEKVIEW_DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 | `/var/peek/peek.db` |
-| `PEEKVIEW_HOST` | `127.0.0.1` | 服务绑定地址 | `0.0.0.0` |
-| `PEEKVIEW_PORT` | `8080` | 服务端口 | `80` |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 | `/var/peek/data` |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 | `/var/peek/peek.db` |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径 | `/home/user/docs,/data` |
+| `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | 服务绑定地址 | `0.0.0.0` |
+| `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 | `80` |
 | `PEEKVIEW_SERVER__BASE_URL` | - | 外部访问 URL（用于反向代理） | `https://example.com` |
-| `PEEKVIEW_API_KEY` | - | API 认证密钥 | `your-secret-key` |
-| `PEEKVIEW_CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 | `https://yourdomain.com` |
-| `PEEKVIEW_ALLOWED_PATHS` | `[]` | 允许读取的本地路径 | `/home/user/docs,/data` |
+| `PEEKVIEW_SERVER__API_KEY` | - | API 认证密钥 | `your-secret-key` |
+| `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 | `https://yourdomain.com` |
 
-### 配置文件（.env）
+**注意**：`__` 分隔符用于访问嵌套配置（如 `storage.data_dir` → `PEEKVIEW_STORAGE__DATA_DIR`）
 
-在项目目录创建 `.env` 文件：
+### 配置文件（推荐生产环境）
+
+创建 `~/.peekview/config.yaml`：
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 8080
+  base_url: https://peek.yourdomain.com
+storage:
+  data_dir: /var/peek/data
+  db_path: /var/peek/peek.db
+  allowed_paths:
+    - /home/user/documents
+```
+
+### .env 文件（适合 Docker/临时配置）
 
 ```bash
 # 数据和数据库
-PEEKVIEW_DATA_DIR=/var/peek/data
-PEEKVIEW_DB_PATH=/var/peek/peek.db
+PEEKVIEW_STORAGE__DATA_DIR=/var/peek/data
+PEEKVIEW_STORAGE__DB_PATH=/var/peek/peek.db
 
 # 网络配置
-PEEKVIEW_HOST=0.0.0.0
-PEEKVIEW_PORT=8080
+PEEKVIEW_SERVER__HOST=0.0.0.0
+PEEKVIEW_SERVER__PORT=8080
 
 # 安全（建议生产环境启用）
-PEEKVIEW_API_KEY=your-random-secret-key-here
+PEEKVIEW_SERVER__API_KEY=your-random-secret-key-here
 
 # CORS（多域名用逗号分隔）
-PEEKVIEW_CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+PEEKVIEW_SERVER__CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
 ```
 
 加载配置：
