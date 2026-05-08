@@ -1,7 +1,7 @@
 # PeekView — 项目索引
 
 > 最后更新：2026-05-08  
-> 当前版本：v0.1.22
+> 当前版本：v0.1.24
 > 工作计划：[docs/plans/work-plan.md](docs/plans/work-plan.md)
 
 ---
