@@ -7,6 +7,19 @@
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-05-08
+
+### 修复
+
+- **Front Matter 正则匹配**
+  - 移除 `/m` 多行标志，确保只有文件开头的 `---` 被识别为 frontmatter
+  - 修复内容中的水平分隔线 `---` 被错误识别为 frontmatter 的问题
+
+- **调试环境数据隔离**
+  - 修复 `dev-server.sh` 环境变量名：`PEEKVIEW_DB_PATH` → `PEEKVIEW_STORAGE__DB_PATH`
+  - 修复 `dev-server.sh` 环境变量名：`PEEKVIEW_DATA_DIR` → `PEEKVIEW_STORAGE__DATA_DIR`
+  - 调试环境 (:8888) 现在正确使用独立数据库，不再污染生产数据
+
 ## [0.1.21] - 2026-05-08
 
 ### 新增

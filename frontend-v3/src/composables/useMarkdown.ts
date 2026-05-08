@@ -6,8 +6,9 @@ export function useMarkdown() {
   const md = new MarkdownIt({ html: true, linkify: true, typographer: true })
   const { highlightCode } = useShiki()
 
-  // Front matter extraction regex
-  const frontMatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n/m
+  // Front matter extraction regex - must be at the very beginning of the file
+  // Note: no /m flag so ^ matches only start of string, not each line
+  const frontMatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n/
 
   function slugify(text: string): string {
     // Keep CJK characters and other word characters, remove punctuation

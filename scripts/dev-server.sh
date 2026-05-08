@@ -66,8 +66,8 @@ start_server() {
     echo "  数据目录: $DATA_DIR/data"
     echo "  自动过期: 3600秒 (1小时)"
     cd backend
-    PEEKVIEW_DATA_DIR="$DATA_DIR/data" \
-    PEEKVIEW_DB_PATH="$DB_PATH" \
+    PEEKVIEW_STORAGE__DATA_DIR="$DATA_DIR/data" \
+    PEEKVIEW_STORAGE__DB_PATH="$DB_PATH" \
     PEEKVIEW_PORT=$PORT \
     PEEKVIEW_CLEANUP__INTERVAL_SECONDS=600 \
     PEEKVIEW_DEBUG_MODE=1 \
