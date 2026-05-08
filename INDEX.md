@@ -1,7 +1,7 @@
 # PeekView — 项目索引
 
 > 最后更新：2026-05-08  
-> 当前版本：v0.1.20
+> 当前版本：v0.1.22
 > 工作计划：[docs/plans/work-plan.md](docs/plans/work-plan.md)
 
 ---
@@ -157,6 +157,7 @@ frontend-v3/src/
 | [debug-workflow.md](docs/process/debug-workflow.md) | **调试工作流程** | ✅ 定稿 |
 | [debug-lessons.md](docs/process/debug-lessons.md) | 调试经验总结 | ✅ 定稿 |
 | [doc-sync-guide.md](docs/process/doc-sync-guide.md) | **文档同步指南** | ✅ 定稿 |
+| [incident-report-data-pollution.md](tests/archived/incident-report-data-pollution.md) | **数据污染事件报告** | ✅ 归档 |
 | [active-tasks.md](docs/process/active-tasks.md) | 活跃任务看板 | 🔄 使用中 |
 | [multi-device-guide.md](docs/process/multi-device-guide.md) | 多设备开发指南 | ✅ 定稿 |
 
@@ -244,7 +245,11 @@ v2 计划已包含以下修订：
 
 | Commit | 说明 | 日期 |
 |--------|------|------|
-| `HEAD` | release: v0.1.19 - Mermaid修复 + 分页器改进 | 2026-05-06 |
+| `HEAD` | fix: archive old E2E tests to prevent production data pollution | 2026-05-08 |
+| `048010c` | fix: localize all external resources + bump version to v0.1.22 | 2026-05-08 |
+| `15e4fc0` | fix: mobile code viewer height to fill screen | 2026-05-08 |
+| `33a12c2` | feat: localize all external resources for offline usage | 2026-05-08 |
+| `16dd8c2` | feat: add config command and persistent base_url | 2026-05-08 |
 | `f3a49f9` | fix: Mermaid图表容器和切换修复 (v0.1.17) | 2026-05-06 |
 | `1da0aa1` | fix: 动态高度计算和静态文件路径修复 | 2026-05-06 |
 | `193cfbd` | auto sync: 前端 Task 16b/16c 核心组件 | 2026-04-23 |
