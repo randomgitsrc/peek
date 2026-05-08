@@ -388,3 +388,120 @@ grep -r "make dev" docs/ --include="*.md"
 4. **纳入检查点**: 将文档同步纳入 P4 一致性检查阶段
 
 **记住**: 文档是代码的契约，两者必须保持一致。
+
+---
+
+## 自动化执行机制
+
+### 三层防护体系
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 第一层: 本地开发 (Git Hooks)                                  │
+│ - pre-commit: 提交前自动检查                                  │
+│ - 即时反馈，修复成本低                                         │
+├─────────────────────────────────────────────────────────────┤
+│ 第二层: CI/CD (GitHub Actions)                               │
+│ - PR 时自动检查                                               │
+│ - 阻止不一致的代码进入主分支                                   │
+├─────────────────────────────────────────────────────────────┤
+│ 第三层: 发布前检查 (Makefile)                                 │
+│ - make check-docs 手动触发                                   │
+│ - 发布前强制验证                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 1. Git Hooks (本地防护)
+
+**安装**:
+```bash
+make setup-hooks
+# 或
+ln -s ../../scripts/git-hooks/pre-commit.sh .git/hooks/pre-commit
+```
+
+**触发时机**:
+- 每次 `git commit` 自动执行
+- 检查环境变量命名规范
+- 如果检查失败，阻止提交
+
+**临时绕过** (紧急修复):
+```bash
+git commit --no-verify  # 跳过 pre-commit hook
+```
+
+### 2. GitHub Actions (CI 防护)
+
+**触发条件**:
+- Push 到 main/develop 分支
+- PR 创建/更新
+- 修改 config.py, cli.py, api/, Makefile, scripts/
+
+**行为**:
+- 运行 `scripts/check_doc_consistency.sh`
+- 检查旧格式环境变量
+- PR 失败时自动评论提醒
+
+**配置**: `.github/workflows/doc-consistency.yml`
+
+### 3. Makefile (手动检查)
+
+**命令**:
+```bash
+# 完整文档一致性检查
+make check-docs
+
+# 只检查环境变量命名
+make check-env-vars
+
+# 完整审计（包含链接检查）
+make doc-audit
+```
+
+**集成到开发流程**:
+```bash
+# 修改代码后
+make check-docs      # 确认文档一致
+make test-quick      # 运行测试
+git add -A
+git commit           # pre-commit hook 自动检查
+```
+
+### 快速开始
+
+```bash
+# 1. 安装自动化
+make setup-hooks
+
+# 2. 验证安装
+make check-docs
+
+# 3. 修改代码...
+# 4. git commit (自动触发检查)
+
+# 5. 推送到 GitHub (CI 自动检查)
+git push origin main
+```
+
+### 故障排除
+
+**pre-commit hook 未触发**:
+```bash
+ls -la .git/hooks/pre-commit  # 确认存在且可执行
+# 如果不存在，重新安装
+make setup-hooks
+```
+
+**CI 检查失败但本地通过**:
+```bash
+# 可能是本地文档未完全同步
+git pull origin main
+make check-docs
+```
+
+**误报处理**:
+```bash
+# 如果确定文档是正确的，可以临时绕过
+git commit --no-verify -m "fix: xxx"
+# 然后在 PR 中说明原因
+```

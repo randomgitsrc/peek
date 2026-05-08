@@ -1,7 +1,7 @@
 # PeekView 项目根级 Makefile
 # 统一前后端构建和发布
 
-.PHONY: help build build-frontend build-backend build-fast test test-quick test-frontend test-backend publish clean install dev debug debug-build debug-start debug-stop debug-test verify-local pre-publish pre-publish-quick bump-version
+.PHONY: help build build-frontend build-backend build-fast test test-quick test-frontend test-backend publish clean install dev debug debug-build debug-start debug-stop debug-test debug-verify-isolation debug-status verify-local pre-publish pre-publish-quick bump-version check-docs check-env-vars doc-audit setup-hooks
 
 # Default target
 help:
@@ -372,3 +372,12 @@ check-env-vars:
 doc-audit: check-docs
 	@echo "=== 文档审计完成 ==="
 	@echo "请检查上述输出，修复不一致的文档"
+
+# Setup Git hooks for automatic documentation checking
+setup-hooks:
+	@echo "=== 安装 Git Hooks ==="
+	@bash scripts/setup-doc-automation.sh
+	@echo "✓ Git hooks 安装完成"
+	@echo ""
+	@echo "钩子功能:"
+	@echo "  - pre-commit: 提交前自动检查文档一致性"
