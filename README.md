@@ -114,26 +114,56 @@ peekview delete my-entry --force
 
 ## 配置
 
-通过环境变量配置：
+### 方式 1：环境变量（最高优先级）
+
+适合 Docker、CI/CD、临时覆盖或敏感信息：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PEEKVIEW_DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
-| `PEEKVIEW_DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 |
-| `PEEKVIEW_ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
-| `PEEKVIEW_HOST` | `127.0.0.1` | 服务绑定地址 |
-| `PEEKVIEW_PORT` | `8080` | 服务端口 |
-| `PEEKVIEW_API_KEY` | - | API 认证密钥（可选） |
-| `PEEKVIEW_CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
+| `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | 服务绑定地址 |
+| `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 |
+| `PEEKVIEW_SERVER__API_KEY` | - | API 认证密钥（可选） |
+| `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
+
+**注意**：`__` 分隔符用于访问嵌套配置（如 `storage.data_dir` → `PEEKVIEW_STORAGE__DATA_DIR`）
 
 也可使用 `.env` 文件：
 
 ```bash
-PEEKVIEW_DATA_DIR=/var/peek/data
-PEEKVIEW_DB_PATH=/var/peek/peek.db
-PEEKVIEW_HOST=0.0.0.0
-PEEKVIEW_PORT=8080
-PEEKVIEW_API_KEY=your-secret-key
+PEEKVIEW_STORAGE__DATA_DIR=/var/peek/data
+PEEKVIEW_STORAGE__DB_PATH=/var/peek/peek.db
+PEEKVIEW_SERVER__HOST=0.0.0.0
+PEEKVIEW_SERVER__PORT=8080
+PEEKVIEW_SERVER__API_KEY=your-secret-key
+```
+
+### 方式 2：Config 文件（持久化配置）
+
+适合保存常用设置，如自定义域名：
+
+```bash
+# ~/.peekview/config.yaml
+server:
+  base_url: https://peek.example.com
+  port: 8080
+storage:
+  data_dir: /var/peekview/data
+  db_path: /var/peekview/peek.db
+```
+
+**优先级**：环境变量 > Config 文件 > 默认值
+
+### 方式 3：命令行参数（一次性覆盖）
+
+```bash
+# 临时指定端口
+peekview serve --port 3000
+
+# 临时指定数据目录
+peekview serve --data-dir /tmp/test-data
 ```
 
 ## 使用自定义域名
