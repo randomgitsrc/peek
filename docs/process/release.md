@@ -46,7 +46,19 @@ make debug
 # 人工验证 http://127.0.0.1:8888
 ```
 
+**⚠️ 重要**: `make debug` 使用 `:8888` 调试端口，不会污染生产环境 (`:8080`)。旧 Python E2E 测试 (`tests/archived/e2e/`) 已被归档，不会意外运行。
+
 ### 4. 预发布检查
+
+**发布前检查生产环境数据**:
+```bash
+# 检查生产环境是否有异常数据
+curl -s http://127.0.0.1:8080/api/v1/entries | jq '.total'
+
+# 如果数量异常，暂停发布并调查
+# 清理命令（如有测试数据）:
+# peekview list --json | jq -r '.[] | select(.summary | test("(?i)(test|stdin|workflow)")) | .slug' | xargs -r peekview delete
+```
 
 ```bash
 # 如果刚运行过 make debug，用快速检查
