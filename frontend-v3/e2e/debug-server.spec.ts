@@ -69,7 +69,8 @@ test.describe('Debug Server - Basic', () => {
 
     // View entry
     await page.goto('/e2e-code-test')
-    await page.waitForSelector('.code-body', { timeout: 5000 })
+    // Wait for code to be highlighted (not loading state)
+    await page.waitForSelector('.code-body:not(:empty)', { timeout: 10000 })
 
     // Verify code is displayed
     const codeText = await page.locator('.code-body').textContent()
@@ -128,15 +129,15 @@ graph TD
     await page.waitForTimeout(3000)
 
     // Click Code to switch to code view
-    await page.click('button:has-text("Code")')
+    await page.click('.mermaid-view-toggle')
     await page.waitForTimeout(500)
 
     // Verify code is visible
     const codeBlock = page.locator('.mermaid-content.code-mode pre')
     await expect(codeBlock).toBeVisible()
 
-    // Click Diagram to switch back
-    await page.click('button:has-text("Diagram")')
+    // Click toggle again to switch back to diagram view
+    await page.click('.mermaid-view-toggle')
     await page.waitForTimeout(2000)
 
     // Verify diagram is still rendered
@@ -194,7 +195,7 @@ test.describe('Debug Server - Pagination', () => {
     await expect(pagination).toBeVisible()
 
     // Check page numbers exist
-    const pageNumbers = await page.locator('.page-number').count()
+    const pageNumbers = await page.locator('.page-num').count()
     expect(pageNumbers).toBeGreaterThan(0)
 
     await page.screenshot({ path: '/tmp/e2e-results/06-pagination.png' })
@@ -208,7 +209,7 @@ test.describe('Debug Server - Pagination', () => {
     const firstPageEntries = await page.locator('.entry-card').count()
 
     // Go to page 2
-    await page.click('.pagination .page-number:nth-child(2)')
+    await page.click('.pagination .page-num:nth-child(2)')
     await page.waitForTimeout(1000)
 
     // Verify different content
@@ -232,8 +233,8 @@ test.describe('Debug Server - Theme', () => {
       document.documentElement.getAttribute('data-theme')
     )
 
-    // Click theme toggle
-    await page.click('.theme-toggle, [title="Toggle theme"]')
+    // Click theme toggle (using btn-icon class and title pattern)
+    await page.click('.btn-icon[title*="Switch to"]', { timeout: 10000 })
     await page.waitForTimeout(500)
 
     // Check theme changed
@@ -277,7 +278,7 @@ test.describe('Debug Server - Mobile', () => {
     const entry = await response.json()
 
     await page.setViewportSize({ width: 375, height: 812 })
-    await page.goto(`/#/entry/${entry.slug}`)
+    await page.goto(`/${entry.slug}`)
     await page.waitForTimeout(500)
 
     // Single file should NOT show Files button
@@ -301,7 +302,7 @@ test.describe('Debug Server - Mobile', () => {
     const entry = await response.json()
 
     await page.setViewportSize({ width: 375, height: 812 })
-    await page.goto(`/#/entry/${entry.slug}`)
+    await page.goto(`/${entry.slug}`)
     await page.waitForTimeout(500)
 
     // Multi file should show Files button with count
