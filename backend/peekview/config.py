@@ -180,6 +180,38 @@ class PeekLogging(BaseSettings):
     )
 
 
+class PeekRemote(BaseSettings):
+    """Remote CLI client configuration.
+
+    Used when CLI operates in remote mode, connecting to a remote PeekView server
+    via HTTP API instead of local SQLite database.
+    """
+
+    url: str = Field(
+        default="",
+        description="Remote server base URL (e.g., https://example.com)",
+    )
+    api_key: str = Field(
+        default="",
+        description="API key for remote authentication (empty = no auth)",
+    )
+    timeout: int = Field(
+        default=30,
+        description="HTTP request timeout in seconds",
+    )
+    verify_ssl: bool = Field(
+        default=True,
+        description="Verify SSL certificates",
+    )
+
+    @field_validator("timeout")
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("Timeout must be positive")
+        return v
+
+
 class PeekConfig(BaseSettings):
     """Main configuration class.
 
@@ -203,6 +235,7 @@ class PeekConfig(BaseSettings):
     limits: PeekLimits = Field(default_factory=PeekLimits)
     cleanup: PeekCleanup = Field(default_factory=PeekCleanup)
     logging: PeekLogging = Field(default_factory=PeekLogging)
+    remote: PeekRemote = Field(default_factory=PeekRemote)
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize config with file overrides."""

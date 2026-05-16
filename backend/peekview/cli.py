@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlmodel import Session
 
 from peekview import __version__
+from peekview.client import PeekClient
 from peekview.config import PeekConfig
 from peekview.database import init_db
 from peekview.main import create_app
@@ -30,6 +31,77 @@ from peekview.models import CreateEntryRequest, EntryCreate
 from peekview.services.entry_service import EntryService
 from peekview.services.file_service import scan_directory
 from peekview.storage import StorageManager
+
+
+def _get_backend(
+    config: PeekConfig,
+    cli_remote_url: str | None = None,
+) -> EntryService | PeekClient:
+    """Get backend for CLI operations.
+
+    Returns PeekClient for remote mode, EntryService for local mode.
+
+    Priority:
+    1. CLI --remote-url argument (empty string = explicit local mode)
+    2. Environment variable PEEKVIEW_REMOTE__URL
+    3. Config file remote.url
+    4. Local mode (default)
+    """
+    # Priority 1: CLI argument
+    if cli_remote_url is not None:
+        remote_url = cli_remote_url
+    else:
+        # Priority 2 & 3: env var or config
+        remote_url = os.environ.get("PEEKVIEW_REMOTE__URL") or config.remote.url
+
+    # Empty string = explicit disable
+    if remote_url:
+        return PeekClient(
+            base_url=remote_url,
+            api_key=config.remote.api_key,
+            timeout=config.remote.timeout,
+            verify_ssl=config.remote.verify_ssl,
+        )
+
+    # Local mode
+    engine = init_db(config.db_path)
+    storage = StorageManager(config=config)
+    return EntryService(engine=engine, storage=storage, config=config)
+
+
+def _is_remote_mode(backend: EntryService | PeekClient) -> bool:
+    """Check if backend is remote PeekClient."""
+    return isinstance(backend, PeekClient)
+
+
+def _scan_directory_local(base_path: Path, ignored_dirs: set[str]) -> list[dict[str, Any]]:
+    """Recursively scan directory and return files_data for remote upload.
+
+    Skips binary files and ignored directories.
+    """
+    files_data = []
+
+    for root, dirs, filenames in os.walk(base_path):
+        # Skip ignored directories
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+
+        for name in filenames:
+            file_path = Path(root) / name
+            try:
+                # Try to read as text
+                content = file_path.read_text(encoding="utf-8", errors="strict")
+                rel_path = file_path.relative_to(base_path)
+                files_data.append({
+                    "path": str(rel_path),
+                    "filename": name,
+                    "content": content,
+                })
+            except UnicodeDecodeError:
+                # Binary file - skip with warning
+                rel_path = file_path.relative_to(base_path)
+                click.echo(f"⚠ Warning: Skipping binary file: {rel_path}", err=True)
+
+    return files_data
 
 
 @click.group()
@@ -97,6 +169,7 @@ def serve(ctx: click.Context, host: str | None, port: int | None, base_url: str 
 @click.option("--expires-in", help="Expiration duration (e.g., '7d', '1h', '30m')")
 @click.option("--from-stdin", is_flag=True, help="Read file content from stdin")
 @click.option("--base-url", "-b", default=None, help="External base URL for generated links (e.g., https://example.com)")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL (e.g., https://example.com)")
 @click.option("--json-output", "-j", is_flag=True, help="Output as JSON")
 def create(
     paths: tuple[str, ...],
@@ -106,6 +179,7 @@ def create(
     expires_in: str | None,
     from_stdin: bool,
     base_url: str | None,
+    remote_url: str | None,
     json_output: bool,
 ) -> None:
     """Create a new entry.
@@ -115,21 +189,29 @@ def create(
         peekview create src/*.py -s "Python project" -t python -t cli
         peekview create -s "From stdin" --from-stdin < code.py
         echo "content" | peekview create -s "From pipe" --from-stdin
+        peekview create file.txt -s "Remote" --remote-url https://example.com
     """
     config = PeekConfig()
-    config.ensure_directories()
 
-    # Set base_url from CLI if provided
-    if base_url:
+    # Get backend (local EntryService or remote PeekClient)
+    backend = _get_backend(config, cli_remote_url=remote_url)
+    is_remote = _is_remote_mode(backend)
+
+    # Show remote mode indicator
+    if is_remote:
+        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
+
+    # Set base_url from CLI if provided (for local mode URL generation)
+    if base_url and not is_remote:
         config.server.base_url = base_url
 
-    engine = init_db(config.db_path)
-    storage = StorageManager(config=config)
-    service = EntryService(engine=engine, storage=storage, config=config)
+    if not is_remote:
+        # Local mode: ensure directories and init DB
+        config.ensure_directories()
 
     # Collect files
-    files_data = []
-    dirs_data = []
+    files_data: list[dict[str, Any]] = []
+    dirs_data: list[dict[str, str]] = []
 
     if from_stdin:
         # Read from stdin
@@ -150,8 +232,13 @@ def create(
                 sys.exit(1)
 
             if path.is_dir():
-                # Add as directory
-                dirs_data.append({"path": str(path.resolve())})
+                if is_remote:
+                    # Remote mode: scan directory locally and add files
+                    scanned_files = _scan_directory_local(path, config.ignored_dirs)
+                    files_data.extend(scanned_files)
+                else:
+                    # Local mode: pass directory to service
+                    dirs_data.append({"path": str(path.resolve())})
             elif path.is_file():
                 # Read file content
                 try:
@@ -169,7 +256,7 @@ def create(
         pass
 
     try:
-        result = service.create_entry(
+        result = backend.create_entry(
             summary=summary,
             slug=slug,
             tags=list(tag),
@@ -201,21 +288,28 @@ def create(
 
 @cli.command()
 @click.argument("slug")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL (e.g., https://example.com)")
 @click.option("--json-output", "-j", is_flag=True, help="Output as JSON")
-def get(slug: str, json_output: bool) -> None:
+def get(slug: str, remote_url: str | None, json_output: bool) -> None:
     """Get entry details by slug.
 
     Examples:
         peekview get my-entry
         peekview get my-entry --json
+        peekview get my-entry --remote-url https://example.com
     """
     config = PeekConfig()
-    engine = init_db(config.db_path)
-    storage = StorageManager(config=config)
-    service = EntryService(engine=engine, storage=storage, config=config)
+
+    # Get backend (local EntryService or remote PeekClient)
+    backend = _get_backend(config, cli_remote_url=remote_url)
+    is_remote = _is_remote_mode(backend)
+
+    # Show remote mode indicator
+    if is_remote:
+        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
 
     try:
-        entry = service.get_entry(slug)
+        entry = backend.get_entry(slug)
 
         if json_output:
             click.echo(json.dumps({
@@ -259,6 +353,7 @@ def get(slug: str, json_output: bool) -> None:
 @click.option("--status", "-s", help="Filter by status")
 @click.option("--page", "-p", default=1, type=int, help="Page number")
 @click.option("--per-page", default=20, type=int, help="Items per page")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL (e.g., https://example.com)")
 @click.option("--json-output", "-j", is_flag=True, help="Output as JSON")
 def list_entries(
     query: str | None,
@@ -266,6 +361,7 @@ def list_entries(
     status: str | None,
     page: int,
     per_page: int,
+    remote_url: str | None,
     json_output: bool,
 ) -> None:
     """List entries with optional filters.
@@ -275,15 +371,21 @@ def list_entries(
         peekview list -q "python"
         peekview list -t cli -t python
         peekview list --status active
+        peekview list --remote-url https://example.com
     """
     config = PeekConfig()
-    engine = init_db(config.db_path)
-    storage = StorageManager(config=config)
-    service = EntryService(engine=engine, storage=storage, config=config)
+
+    # Get backend (local EntryService or remote PeekClient)
+    backend = _get_backend(config, cli_remote_url=remote_url)
+    is_remote = _is_remote_mode(backend)
+
+    # Show remote mode indicator
+    if is_remote:
+        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
 
     try:
         tag_list = list(tag) if tag else None
-        result = service.list_entries(
+        result = backend.list_entries(
             q=query,
             tags=tag_list,
             status=status,
@@ -291,33 +393,53 @@ def list_entries(
             per_page=per_page,
         )
 
+        # Handle both local (EntryListResponse) and remote (dict) results
+        if is_remote:
+            items = result.get("items", [])
+            total = result.get("total", 0)
+            page_num = result.get("page", page)
+            per_page_num = result.get("per_page", per_page)
+        else:
+            items = result.items
+            total = result.total
+            page_num = result.page
+            per_page_num = result.per_page
+
         if json_output:
             click.echo(json.dumps({
                 "items": [
                     {
-                        "id": item.id,
-                        "slug": item.slug,
-                        "summary": item.summary,
-                        "tags": item.tags,
-                        "status": item.status,
-                        "file_count": item.file_count,
-                        "created_at": item.created_at.isoformat() if item.created_at else None,
-                        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+                        "id": item.get("id") if isinstance(item, dict) else item.id,
+                        "slug": item.get("slug") if isinstance(item, dict) else item.slug,
+                        "summary": item.get("summary") if isinstance(item, dict) else item.summary,
+                        "tags": item.get("tags") if isinstance(item, dict) else item.tags,
+                        "status": item.get("status") if isinstance(item, dict) else item.status,
+                        "file_count": item.get("file_count") if isinstance(item, dict) else item.file_count,
+                        "created_at": (item.get("created_at") if isinstance(item, dict)
+                                       else item.created_at.isoformat() if item.created_at else None),
+                        "updated_at": (item.get("updated_at") if isinstance(item, dict)
+                                       else item.updated_at.isoformat() if item.updated_at else None),
                     }
-                    for item in result.items
+                    for item in items
                 ],
-                "total": result.total,
-                "page": result.page,
-                "per_page": result.per_page,
+                "total": total,
+                "page": page_num,
+                "per_page": per_page_num,
             }, indent=2))
         else:
-            click.echo(f"Entries ({result.total} total, page {result.page}):")
+            click.echo(f"Entries ({total} total, page {page_num}):")
             click.echo()
-            for item in result.items:
-                tags_str = f" [{', '.join(item.tags)}]" if item.tags else ""
-                click.echo(f"  {item.slug}{tags_str}")
-                click.echo(f"    {item.summary[:60]}{'...' if len(item.summary) > 60 else ''}")
-                click.echo(f"    {item.file_count} files | {item.status}")
+            for item in items:
+                item_slug = item.get("slug") if isinstance(item, dict) else item.slug
+                item_summary = item.get("summary") if isinstance(item, dict) else item.summary
+                item_tags = item.get("tags") if isinstance(item, dict) else item.tags
+                item_file_count = item.get("file_count") if isinstance(item, dict) else item.file_count
+                item_status = item.get("status") if isinstance(item, dict) else item.status
+
+                tags_str = f" [{', '.join(item_tags)}]" if item_tags else ""
+                click.echo(f"  {item_slug}{tags_str}")
+                click.echo(f"    {item_summary[:60]}{'...' if len(item_summary) > 60 else ''}")
+                click.echo(f"    {item_file_count} files | {item_status}")
                 click.echo()
 
     except Exception as e:
@@ -327,21 +449,28 @@ def list_entries(
 
 @cli.command()
 @click.argument("slug")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL (e.g., https://example.com)")
 @click.confirmation_option(prompt="Are you sure you want to delete this entry?")
-def delete(slug: str) -> None:
+def delete(slug: str, remote_url: str | None) -> None:
     """Delete an entry by slug.
 
     Examples:
         peekview delete my-entry
         peekview delete my-entry --yes  # Skip confirmation
+        peekview delete my-entry --remote-url https://example.com
     """
     config = PeekConfig()
-    engine = init_db(config.db_path)
-    storage = StorageManager(config=config)
-    service = EntryService(engine=engine, storage=storage, config=config)
+
+    # Get backend (local EntryService or remote PeekClient)
+    backend = _get_backend(config, cli_remote_url=remote_url)
+    is_remote = _is_remote_mode(backend)
+
+    # Show remote mode indicator
+    if is_remote:
+        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
 
     try:
-        service.delete_entry(slug)
+        backend.delete_entry(slug)
         click.echo(f"✓ Deleted entry: {slug}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -368,25 +497,46 @@ def config_set(key: str, value: str) -> None:
 
     Supported keys:
     - base_url: External base URL for generated links
+    - remote.url: Remote server URL
+    - remote.api_key: API key for remote authentication
+    - remote.timeout: Request timeout in seconds
+    - remote.verify_ssl: Verify SSL certificates (true/false)
 
     Examples:
         peekview config set base_url https://example.com
+        peekview config set remote.url https://example.com
+        peekview config set remote.api_key sk-xxx
     """
     from peekview.config import load_config_file, save_config_file, CONFIG_FILE
 
     config = load_config_file()
 
     # Validate key
-    if key not in ["base_url"]:
+    supported_keys = ["base_url", "remote.url", "remote.api_key", "remote.timeout", "remote.verify_ssl"]
+    if key not in supported_keys:
         click.echo(f"Error: Unknown config key '{key}'", err=True)
-        click.echo("Supported keys: base_url", err=True)
+        click.echo(f"Supported keys: {', '.join(supported_keys)}", err=True)
         sys.exit(1)
 
-    # Handle nested keys (e.g., server.base_url)
+    # Handle nested keys
     if key == "base_url":
         if "server" not in config:
             config["server"] = {}
         config["server"]["base_url"] = value
+    elif key.startswith("remote."):
+        if "remote" not in config:
+            config["remote"] = {}
+        remote_key = key.split(".", 1)[1]
+        # Convert boolean strings
+        if remote_key == "verify_ssl":
+            value = value.lower() in ("true", "1", "yes")
+        elif remote_key == "timeout":
+            try:
+                value = int(value)
+            except ValueError:
+                click.echo(f"Error: timeout must be an integer", err=True)
+                sys.exit(1)
+        config["remote"][remote_key] = value
 
     save_config_file(config)
     click.echo(f"✓ Set {key} = {value}")
@@ -400,6 +550,7 @@ def config_get(key: str) -> None:
 
     Examples:
         peekview config get base_url
+        peekview config get remote.url
     """
     from peekview.config import load_config_file
 
@@ -408,10 +559,11 @@ def config_get(key: str) -> None:
     # Handle nested keys
     if key == "base_url":
         value = config.get("server", {}).get("base_url", "")
-        if value:
-            click.echo(value)
-        else:
-            click.echo("(not set)")
+        click.echo(value if value else "(not set)")
+    elif key.startswith("remote."):
+        remote_key = key.split(".", 1)[1]
+        value = config.get("remote", {}).get(remote_key, "")
+        click.echo(value if value else "(not set)")
     else:
         click.echo(f"Error: Unknown config key '{key}'", err=True)
         sys.exit(1)

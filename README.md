@@ -125,6 +125,93 @@ peekview api openapi
 
 ---
 
+## 远程 CLI 模式
+
+从 v0.1.25 开始，PeekView 支持远程 CLI 模式。你可以在一台机器上运行服务端，从其他机器通过 CLI 创建和管理条目。
+
+### 场景示例
+
+```
+机器 A (服务端): peekview serve --base-url https://peek.example.com
+机器 B (客户端): peekview create file.txt -s "My code"  →  上传到机器 A
+```
+
+### 配置远程服务端
+
+**方式 1：Config 文件（推荐）**
+
+```yaml
+# ~/.peekview/config.yaml
+remote:
+  url: https://peek.example.com
+  api_key: sk-your-api-key          # 如果服务端启用了 API Key 认证
+  timeout: 60                       # 请求超时（秒）
+  verify_ssl: true                  # SSL 证书校验
+```
+
+配置后，所有 CLI 命令会自动使用远程模式：
+
+```bash
+peekview create file.txt -s "My code"     # 自动上传到远程服务端
+peekview list                              # 列出远程服务端的所有条目
+peekview get my-entry                      # 获取远程条目详情
+peekview delete my-entry                   # 删除远程条目
+```
+
+**方式 2：环境变量**
+
+```bash
+export PEEKVIEW_REMOTE__URL=https://peek.example.com
+export PEEKVIEW_REMOTE__API_KEY=sk-your-api-key
+
+peekview create file.txt -s "My code"
+```
+
+**方式 3：命令行参数（临时）**
+
+```bash
+# 临时指定远程服务端（不影响其他命令）
+peekview create file.txt -s "My code" --remote-url https://peek.example.com
+peekview list --remote-url https://peek.example.com
+```
+
+### 显式使用本地模式
+
+如果配置了远程服务端，但想临时使用本地模式：
+
+```bash
+# 方式 1：空字符串显式禁用
+peekview create file.txt -s "Local only" --remote-url ""
+
+# 方式 2：移除配置文件中的 remote.url
+peekview config set remote.url ""
+```
+
+### 远程模式限制
+
+- **仅支持文本文件**：二进制文件会被跳过并显示警告
+- **不支持 local_path**：远程模式无法访问服务端本地文件系统
+- **目录扫描**：在客户端本地完成扫描后上传文件内容
+
+### 配置命令
+
+```bash
+# 设置远程服务端地址
+peekview config set remote.url https://peek.example.com
+
+# 设置 API Key
+peekview config set remote.api_key sk-your-api-key
+
+# 设置超时时间
+peekview config set remote.timeout 60
+
+# 查看当前配置
+peekview config get remote.url
+peekview config list
+```
+
+---
+
 ## 配置
 
 ### 方式 1：环境变量（最高优先级）
@@ -140,6 +227,10 @@ peekview api openapi
 | `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 |
 | `PEEKVIEW_SERVER__API_KEY` | - | API 认证密钥（可选） |
 | `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
+| `PEEKVIEW_REMOTE__URL` | - | 远程服务端地址（远程 CLI 模式） |
+| `PEEKVIEW_REMOTE__API_KEY` | - | 远程 API 认证密钥 |
+| `PEEKVIEW_REMOTE__TIMEOUT` | `30` | 远程请求超时（秒） |
+| `PEEKVIEW_REMOTE__VERIFY_SSL` | `true` | 远程 SSL 证书校验 |
 
 **注意**：`__` 分隔符用于访问嵌套配置（如 `storage.data_dir` → `PEEKVIEW_STORAGE__DATA_DIR`）
 
