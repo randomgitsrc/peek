@@ -4,6 +4,7 @@
 
 Agent（AI）产出 → PeekView 格式化 → 人类友好查看
 
+[![Version](https://img.shields.io/badge/version-0.1.24-blue.svg)](https://github.com/randomgitsrc/peekview/releases)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3.4+-green.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -57,7 +58,9 @@ peekview serve --host 0.0.0.0 --port 8080
 - 🎨 **代码高亮** - 基于 Shiki 的语法高亮，支持 100+ 语言
 - 📝 **Markdown 渲染** - GitHub 风格 Markdown，自动生成目录
 - 🔍 **全文搜索** - SQLite FTS5 高性能搜索
-- 📂 **多文件支持** - 单条目多文件，树形展示
+- 📂 **多文件支持** - 单条目多文件，文件树形目录展示
+- 📤 **文件上传** - 支持内容直传、本地路径引用、批量上传
+- 🌐 **REST API** - 完整的 RESTful CRUD 接口（rest-api），支持 API Key 认证
 - 🌓 **主题切换** - 深色/浅色模式，自动跟随系统
 - 📱 **移动端适配** - 响应式设计，底部工具栏
 - 🔗 **URL 友好** - 支持 slug、文件参数、行号高亮
