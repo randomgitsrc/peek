@@ -51,3 +51,4 @@ node_modules/
 ffmpeg
 ffmpeg-master-latest-linux64-gpl/
 ffmpeg.tar.xz
+FEATURES.json
