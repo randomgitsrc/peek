@@ -813,5 +813,59 @@ def stop_service(user_mode: bool) -> None:
         sys.exit(1)
 
 
+@cli.group(name="api")
+def api_cmd():
+    """Show API documentation and endpoints.
+
+    Examples:
+        peekview api              # Show API overview
+        peekview api --endpoints  # List all API endpoints
+        peekview api --openapi    # Show OpenAPI schema URL
+    """
+    pass
+
+
+@api_cmd.command(name="endpoints")
+@click.option("--base-url", "-b", default=None, help="Base URL (e.g., http://localhost:8080)")
+def api_endpoints(base_url: str | None) -> None:
+    """List all REST API endpoints."""
+    config = PeekConfig()
+    url = base_url or config.server.base_url or f"http://{config.server.host}:{config.server.port}"
+
+    click.echo(f"API Base URL: {url}")
+    click.echo("")
+    click.echo("Health Check:")
+    click.echo(f"  GET    {url}/health")
+    click.echo("")
+    click.echo("Entries API:")
+    click.echo(f"  POST   {url}/api/v1/entries        - Create new entry")
+    click.echo(f"  GET    {url}/api/v1/entries        - List entries (with search/filter)")
+    click.echo(f"  GET    {url}/api/v1/entries/<slug> - Get entry details")
+    click.echo(f"  PATCH  {url}/api/v1/entries/<slug> - Update entry")
+    click.echo(f"  DELETE {url}/api/v1/entries/<slug> - Delete entry")
+    click.echo("")
+    click.echo("Files API:")
+    click.echo(f"  GET    {url}/api/v1/entries/<slug>/files/<file_id> - Download file")
+    click.echo(f"  GET    {url}/api/v1/entries/<slug>/files/<file_id>/content - Get file content")
+    click.echo("")
+    click.echo("Query Parameters:")
+    click.echo("  /api/v1/entries?q=keyword          - Full-text search")
+    click.echo("  /api/v1/entries?tags=python,cli    - Filter by tags")
+    click.echo("  /api/v1/entries?page=1&per_page=20 - Pagination")
+
+
+@api_cmd.command(name="openapi")
+@click.option("--base-url", "-b", default=None, help="Base URL (e.g., http://localhost:8080)")
+def api_openapi(base_url: str | None) -> None:
+    """Show OpenAPI/Swagger UI URLs."""
+    config = PeekConfig()
+    url = base_url or config.server.base_url or f"http://{config.server.host}:{config.server.port}"
+
+    click.echo("OpenAPI Documentation:")
+    click.echo(f"  Swagger UI:    {url}/docs")
+    click.echo(f"  ReDoc:         {url}/redoc")
+    click.echo(f"  OpenAPI JSON:  {url}/openapi.json")
+
+
 if __name__ == "__main__":
     cli()
