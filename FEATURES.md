@@ -38,3 +38,24 @@
 
 ## CLI Commands
 
+| Command | Status | Notes |
+|---------|--------|-------|
+| create | ✅ | Local mode + Remote CLI mode |
+| list | ✅ | Local mode + Remote CLI mode |
+| get | ✅ | Local mode + Remote CLI mode |
+| delete | ✅ | Local mode + Remote CLI mode |
+| serve | ✅ | |
+| config | ✅ | |
+| service | ✅ | systemd/launchd |
+| api | ✅ | v0.1.25+ |
+
+## Remote CLI Mode (v0.1.25+)
+
+- ✅ PeekClient HTTP client
+- ✅ Transparent mode switching
+- ✅ Config file support
+- ✅ Environment variables
+- ✅ API Key authentication
+- ✅ Binary file detection
+- ✅ Integration tests
+

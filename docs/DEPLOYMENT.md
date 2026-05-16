@@ -277,6 +277,10 @@ server {
 | `PEEKVIEW_SERVER__BASE_URL` | - | 外部访问 URL（用于反向代理） | `https://example.com` |
 | `PEEKVIEW_SERVER__API_KEY` | - | API 认证密钥 | `your-secret-key` |
 | `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 | `https://yourdomain.com` |
+| `PEEKVIEW_REMOTE__URL` | - | 远程服务端地址（远程 CLI 模式）| `https://peek.example.com` |
+| `PEEKVIEW_REMOTE__API_KEY` | - | 远程 API 认证密钥 | `sk-your-key` |
+| `PEEKVIEW_REMOTE__TIMEOUT` | `30` | 远程请求超时（秒）| `60` |
+| `PEEKVIEW_REMOTE__VERIFY_SSL` | `true` | 远程 SSL 证书校验 | `false` |
 
 **注意**：`__` 分隔符用于访问嵌套配置（如 `storage.data_dir` → `PEEKVIEW_STORAGE__DATA_DIR`）
 
@@ -294,7 +298,18 @@ storage:
   db_path: /var/peek/peek.db
   allowed_paths:
     - /home/user/documents
+remote:
+  url: https://peek.yourdomain.com
+  api_key: sk-your-api-key
+  timeout: 30
+  verify_ssl: true
 ```
+
+**Remote CLI 配置说明**（v0.1.25+）：
+- `remote.url`: 远程服务端地址，设置后 CLI 自动使用远程模式
+- `remote.api_key`: API 认证密钥（如果服务端启用了 `PEEKVIEW_SERVER__API_KEY`）
+- `remote.timeout`: HTTP 请求超时时间（秒）
+- `remote.verify_ssl`: 是否验证 SSL 证书（自签名证书可设为 `false`）
 
 ### .env 文件（适合 Docker/临时配置）
 
@@ -395,6 +410,37 @@ peekview delete monthly-report-2024
 # 强制删除（无需确认）
 peekview delete monthly-report-2024 --force
 ```
+
+#### 5. Remote CLI 模式（v0.1.25+）
+
+Remote CLI 模式允许你从其他机器通过 CLI 连接远程 PeekView 服务端：
+
+```bash
+# 配置远程服务端（方式1：Config 文件）
+peekview config set remote.url https://peek.example.com
+peekview config set remote.api_key sk-your-api-key
+
+# 配置远程服务端（方式2：环境变量）
+export PEEKVIEW_REMOTE__URL=https://peek.example.com
+export PEEKVIEW_REMOTE__API_KEY=sk-your-api-key
+
+# 配置远程服务端（方式3：命令行参数）
+peekview create file.txt -s "My code" --remote-url https://peek.example.com
+
+# 所有 CLI 命令在配置后自动使用远程模式
+peekview create file.txt -s "Test"           # 上传到远程服务端
+peekview list                                 # 列出远程条目
+peekview get my-entry                         # 获取远程条目详情
+peekview delete my-entry                      # 删除远程条目
+
+# 临时使用本地模式（覆盖远程配置）
+peekview create file.txt -s "Local only" --remote-url ""
+```
+
+**Remote CLI 限制**：
+- 仅支持文本文件（二进制文件会被跳过）
+- 不支持 `local_path` 模式（无法访问服务端本地文件）
+- 目录扫描在客户端完成，然后上传文件内容
 
 ### 二、Web 界面使用
 

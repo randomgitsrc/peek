@@ -7,6 +7,39 @@
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-05-16
+
+### 新增
+
+- **Remote CLI 模式** - 支持 CLI 作为 HTTP 客户端连接远程服务端
+  - 新增 `PeekClient` 类，通过 HTTP API 与远程服务端通信
+  - 透明模式切换：CLI 自动检测本地/远程模式，无需改变命令语法
+  - 支持三种配置方式：Config 文件、环境变量、命令行参数
+  - 新增 `--remote-url` 选项用于临时指定远程服务端
+  - 支持 API Key 认证（`PEEKVIEW_REMOTE__API_KEY`）
+  - 二进制文件自动跳过并显示警告
+
+- **API 文档命令** - 新增 `peekview api` 子命令
+  - `peekview api endpoints` - 列出所有 API 端点
+  - `peekview api openapi` - 显示 OpenAPI/Swagger 文档地址
+
+### 配置
+
+- 新增远程配置项（`~/.peekview/config.yaml`）:
+  ```yaml
+  remote:
+    url: https://peek.example.com
+    api_key: sk-your-api-key
+    timeout: 30
+    verify_ssl: true
+  ```
+
+### 文档
+
+- 更新 README.md 添加 Remote CLI 完整使用指南
+- 更新 DEPLOYMENT.md 添加远程模式部署说明
+- 新增 Remote CLI 集成测试脚本 (`scripts/debug-remote-cli.sh`)
+
 ## [0.1.24] - 2026-05-08
 
 ### 修复

@@ -1,7 +1,7 @@
 # PeekView — 项目索引
 
-> 最后更新：2026-05-08  
-> 当前版本：v0.1.24
+> 最后更新：2026-05-16  
+> 当前版本：v0.1.25
 > 工作计划：[docs/plans/work-plan.md](docs/plans/work-plan.md)
 
 ---
@@ -41,11 +41,12 @@
 | Task 10 | API 路由 | ✅ | `peekview/api/entries.py`, `peekview/api/files.py` |
 | Task 11 | 安全测试 | ✅ | `tests/test_security.py` (26 tests) |
 | Task 12 | CLI 命令 | ✅ | `peekview/cli.py`, `tests/test_cli.py` (32 tests) |
+| Task 13 | Remote CLI 模式 | ✅ | `peekview/client.py`, Remote CLI 集成测试 |
 
 **后端测试覆盖**:
 - 单元测试：models, storage, language, cleanup
 - API 测试：所有 HTTP 端点
-- CLI 测试：所有命令
+- CLI 测试：所有命令（本地模式 + Remote CLI 模式）
 - 安全测试：路径遍历、黑名单、XSS、SQL 注入
 - **当前覆盖率**: ~75%
 
@@ -211,6 +212,7 @@ frontend-v3/src/
 - ✅ 资源限制（文件大小、条目文件数、总存储）
 - ✅ 安全机制（路径遍历防护、黑名单、XSS 防护）
 - ✅ CLI 工具（serve/create/list/get/delete）
+- ✅ **Remote CLI 模式（v0.1.25）** - CLI 作为 HTTP 客户端连接远程服务端
 - ✅ 健康检查（/health）
 
 **前端**:
@@ -246,7 +248,8 @@ v2 计划已包含以下修订：
 
 | Commit | 说明 | 日期 |
 |--------|------|------|
-| `HEAD` | fix: archive old E2E tests to prevent production data pollution | 2026-05-08 |
+| `HEAD` | feat: Remote CLI mode + API command (v0.1.25) | 2026-05-16 |
+| `...` | fix: archive old E2E tests to prevent production data pollution | 2026-05-08 |
 | `048010c` | fix: localize all external resources + bump version to v0.1.22 | 2026-05-08 |
 | `15e4fc0` | fix: mobile code viewer height to fill screen | 2026-05-08 |
 | `33a12c2` | feat: localize all external resources for offline usage | 2026-05-08 |
