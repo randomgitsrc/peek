@@ -64,8 +64,8 @@ class PeekAPI {
       status: entry.status as 'active' | 'expired',
       files: [],
       fileCount: entry.file_count,
-      isPublic: entry.is_public,
-      ownerId: entry.owner_id,
+      isPublic: entry.is_public ?? true,
+      ownerId: entry.owner_id ?? null,
       username: entry.username,
       createdAt: entry.created_at,
     }
@@ -79,8 +79,8 @@ class PeekAPI {
       tags: entry.tags,
       status: entry.status as 'active' | 'expired',
       files: entry.files.map(f => this.transformFile(f)),
-      isPublic: entry.is_public,
-      ownerId: entry.owner_id,
+      isPublic: entry.is_public ?? true,
+      ownerId: entry.owner_id ?? null,
       username: entry.username,
       createdAt: entry.created_at,
     }
