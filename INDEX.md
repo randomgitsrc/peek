@@ -107,22 +107,13 @@ frontend-v3/src/
 
 ## 文档清单
 
-### 📋 规格文档 (`docs/specs/`)
+### 📋 规格文档
 
-| 文件 | 说明 | 状态 |
-|------|------|------|
-| [spec-user-auth.md](docs/specs/spec-user-auth.md) | 用户认证规格 — JWT + 可见性 + API Key | ✅ 定稿 |
-| [spec-remote-cli.md](docs/specs/spec-remote-cli.md) | 远程 CLI 规格 | ✅ 定稿 |
+> 所有规格文档已归档至 `docs/archived/specs/`（对应功能均已实现）
 
-> MVP 阶段规格文档（需求、设计、测试计划、评审）已归档至 `docs/archived/specs/`
+### 📝 实现计划
 
-### 📝 实现计划 (`docs/plans/`)
-
-| 文件 | 说明 | 状态 |
-|------|------|------|
-| [impl-plan-admin-role.md](docs/plans/impl-plan-admin-role.md) | Admin 角色计划 | 🔄 部分完成 |
-
-> 已完成的计划（MVP, Auth, Remote CLI, API Keys, Work Plan）已归档至 `docs/archived/plans/`
+> 所有实现计划已归档至 `docs/archived/plans/`（对应功能均已实现）
 
 ### 🔍 评审 (`docs/reviews/`)
 
@@ -151,8 +142,11 @@ frontend-v3/src/
 
 | 子目录 | 说明 |
 |--------|------|
-| `specs/` | MVP 阶段规格（需求 v2.0、设计 v2.0、测试计划 v3.0、评审） |
-| `plans/` | 已完成的实现计划（MVP 16任务、Auth、Remote CLI、API Keys、Work Plan） |
+| `specs/` | 所有规格文档（MVP + Auth + Remote CLI，对应功能均已实现）|
+| `plans/` | 所有实现计划（MVP + Auth + Remote CLI + API Keys + Admin Role）|
+| `mermaid-feature/` | Mermaid 功能开发过程文档（已上线）|
+| `checkpoints/` | 历史任务检查点（P0-T19 等）|
+| `incident-report-data-pollution.md` | v0.1.22 生产数据污染事件记录 |
 | `reviews/` | 已解决的评审（Eng 评审、预实现审计、API Key 评审 v1/v2） |
 | `P0-T19/` ~ `P4-T19/` | 软件工程化检查点文档 |
 | `superpowers/` | AI 辅助设计历史 |
