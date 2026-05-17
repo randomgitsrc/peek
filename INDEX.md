@@ -1,8 +1,7 @@
 # PeekView — 项目索引
 
-> 最后更新：2026-05-16  
-> 当前版本：v0.1.25
-> 工作计划：[docs/plans/work-plan.md](docs/plans/work-plan.md)
+> 最后更新：2026-05-17
+> 当前版本：v0.1.26
 
 ---
 
@@ -10,111 +9,99 @@
 
 | 阶段 | 状态 | 说明 |
 |------|------|------|
-| 需求规格 | ✅ v2.0 定稿 | 2026-04-17 |
-| 技术设计 | ✅ v2.0 定稿 | 2026-04-17 |
-| 测试计划 | ✅ v3.0 定稿 | 2026-04-24 |
-| 三方评审（PM/架构/QA） | ✅ 修正已提交 `ece3c0e` | 2026-04-17 |
-| 实现计划 | ✅ v2 定稿 | 2026-04-18 |
-| autoplan 对抗评审 | ✅ CEO/Design/Eng/DX 四方完成 | 2026-04-18 |
-| 后端实现 | ✅ Tasks 0-12 完成 | 2026-04-22 |
-| 前端实现 | ✅ Tasks 14-16 完成 | 2026-04-23 |
-| 软件工程化 | ✅ Phase 1-4 完成 + [开发流程定稿](docs/process/workflow.md) | 2026-04-24 |
+| 需求规格 | ✅ 定稿 | MVP + Auth + Remote CLI |
+| 技术设计 | ✅ 定稿 | FastAPI + SQLite + Vue 3 |
+| 后端实现 | ✅ 完成 | Tasks 0-12 + Auth + API Keys + Admin |
+| 前端实现 | ✅ 完成 | Tasks 14-16 + Auth UI + API Keys UI + All/Mine |
+| E2E 测试 | ✅ 52 测试通过 | chromium + Mobile Chrome |
+| 后端测试 | ✅ 393 测试通过 | pytest |
 
 ---
 
-## 实现进度详情
+## 功能实现进度
 
 ### 后端（Python + FastAPI）
 
-| 任务 | 内容 | 状态 | 关键文件 |
-|------|------|------|----------|
-| Task 0 | 测试基础设施 | ✅ | `tests/conftest.py`, `tests/factories.py` |
-| Task 1 | 项目脚手架 | ✅ | `pyproject.toml`, `peekview/__main__.py` |
-| Task 2 | 异常层级 | ✅ | `peekview/exceptions.py` |
-| Task 3 | 配置管理 | ✅ | `peekview/config.py` |
-| Task 4 | 数据模型 | ✅ | `peekview/models.py` |
-| Task 5 | 语言检测 | ✅ | `peekview/language.py` |
-| Task 6 | 数据库初始化 | ✅ | `peekview/database.py` (WAL + FTS5) |
-| Task 7 | 文件存储层 | ✅ | `peekview/storage.py` (原子写入、路径安全) |
-| Task 8 | 文件服务 | ✅ | `peekview/services/file_service.py` (allowlist) |
-| Task 9 | 条目服务 | ✅ | `peekview/services/entry_service.py` (事务) |
-| Task 10 | API 路由 | ✅ | `peekview/api/entries.py`, `peekview/api/files.py` |
-| Task 11 | 安全测试 | ✅ | `tests/test_security.py` (26 tests) |
-| Task 12 | CLI 命令 | ✅ | `peekview/cli.py`, `tests/test_cli.py` (32 tests) |
-| Task 13 | Remote CLI 模式 | ✅ | `peekview/client.py`, Remote CLI 集成测试 |
+| 功能 | 状态 | 关键文件 |
+|------|------|----------|
+| 核心条目 CRUD | ✅ | `api/entries.py`, `services/entry_service.py` |
+| 文件上传/下载 | ✅ | `api/files.py`, `services/file_service.py` |
+| FTS5 全文搜索 | ✅ | `database.py` |
+| 安全防护 | ✅ | `storage.py`, `file_service.py`, `test_security.py` |
+| CLI 工具 | ✅ | `cli.py`, `client.py` |
+| 用户认证 (JWT) | ✅ | `auth.py`, `api/auth.py` |
+| 条目可见性 | ✅ | `models.py` (is_public, owner_id) |
+| Admin 角色 | ✅ | `models.py` (is_admin), `cli.py` (promote/demote) |
+| API Key 管理 | ✅ | `services/apikey_service.py`, `api/apikeys.py` |
+| All/Mine 筛选 | ✅ | `entry_service.py` (owner param) |
+| 远程 CLI 模式 | ✅ | `client.py`, `cli.py` |
+| 系统服务管理 | ✅ | `cli.py` (service install/start/stop) |
 
-**后端测试覆盖**:
-- 单元测试：models, storage, language, cleanup
-- API 测试：所有 HTTP 端点
-- CLI 测试：所有命令（本地模式 + Remote CLI 模式）
-- 安全测试：路径遍历、黑名单、XSS、SQL 注入
-- **当前覆盖率**: ~75%
+**后端测试覆盖**: 393 测试通过（安全 26 + 认证 30 + API Key 26 + CLI 32 + API + 其他）
 
 ### 前端（Vue 3 + Vite + TypeScript）
 
-> **注意**: 当前使用 `frontend-v3/` 目录。`frontend/` 目录为旧版本，已弃用，仅作参考保留。
+| 功能 | 状态 | 关键文件 |
+|------|------|----------|
+| 代码高亮 (Shiki) | ✅ | `composables/useShiki.ts`, `components/CodeViewer.vue` |
+| Markdown 渲染 | ✅ | `components/MarkdownViewer.vue` |
+| Mermaid 图表 | ✅ | `components/MermaidDiagram.vue` |
+| 文件树 | ✅ | `components/FileTree.vue` |
+| 主题切换 | ✅ | `composables/useTheme.ts` |
+| 移动端适配 | ✅ | `components/MobileBottomBar.vue`, `MobileFileDrawer.vue` |
+| 条目列表 + 分页 | ✅ | `views/EntryListView.vue`, `components/Pagination.vue` |
+| 条目详情 | ✅ | `views/EntryDetailView.vue` |
+| 用户认证 UI | ✅ | `components/LoginDialog.vue`, `stores/auth.ts` |
+| 所有者操作 | ✅ | 可见性切换、删除（卡片操作按钮） |
+| All/Mine 标签页 | ✅ | `views/EntryListView.vue` |
+| API Key 管理 | ✅ | `views/ApiKeyListView.vue` |
+| 用户菜单 | ✅ | 下拉菜单（API Keys + Logout） |
 
-| 任务 | 内容 | 状态 | 关键文件 |
-|------|------|------|----------|
-| Task 14 | 项目脚手架 | ✅ | `frontend-v3/package.json`, `vite.config.ts`, `tsconfig.json` |
-| Task 14 | 设计系统 | ✅ | `frontend-v3/src/styles/variables.css`, `dark.css`, `light.css` |
-| Task 14 | 主题系统 | ✅ | `frontend-v3/src/composables/useTheme.ts`, FOUC 预防 |
-| Task 15 | 类型定义 | ✅ | `frontend-v3/src/types/index.ts` |
-| Task 15 | API 客户端 | ✅ | `frontend-v3/src/api/client.ts` |
-| Task 15 | UI 组件 | ✅ | `frontend-v3/src/components/ui/Button.vue`, `IconButton.vue`, `Toast.vue`, `Tooltip.vue`, `LoadingSkeleton.vue` |
-| Task 15 | Toast 系统 | ✅ | `frontend-v3/src/composables/useToast.ts`, `components/ui/Toast.vue` |
-| Task 16a | 主题基础设施 | ✅ | `frontend-v3/index.html` FOUC 脚本, `useTheme.ts` |
-| Task 16b | Shiki 高亮 | ✅ | `frontend-v3/src/composables/useShiki.ts` (单例, CSS variables 模式) |
-| Task 16b | CodeViewer | ✅ | `frontend-v3/src/components/CodeViewer.vue` (行号、复制、换行、URL hash) |
-| Task 16b | MarkdownViewer | ✅ | `frontend-v3/src/components/MarkdownViewer.vue` (TOC、代码块复制、表格滚动) |
-| Task 16b | FileTree | ✅ | `frontend-v3/src/components/FileTree.vue`, `TreeNodeItem.vue` (递归树) |
-| Task 16c | 数据获取 | ✅ | `frontend-v3/src/composables/useEntry.ts` (缓存、错误状态) |
-| Task 16c | 主题切换组件 | ✅ | `frontend-v3/src/components/ThemeToggle.vue` |
-| Task 16c | 移动端抽屉 | ✅ | `frontend-v3/src/components/MobileFileDrawer.vue`, `MobileTocDrawer.vue` |
-| Task 16c | 移动端底部栏 | ✅ | `frontend-v3/src/components/MobileBottomBar.vue` (Wrap/Copy/Download/TOC) |
-| Task 16c | 列表视图 | ✅ | `frontend-v3/src/views/EntryListView.vue` (搜索、分页、加载/错误态) |
-| Task 16c | 详情视图 | ✅ | `frontend-v3/src/views/EntryDetailView.vue` (三栏布局、URL 深链接) |
+**前端 E2E 测试**: 52 测试通过（基础 + Mermaid + 分页 + 主题 + 移动端 + 认证 + All/Mine + API Keys）
 
-**前端架构** (`frontend-v3/src/`):
+---
+
+## 前端架构 (`frontend-v3/src/`)
+
 ```
 frontend-v3/src/
 ├── api/
-│   └── client.ts              # API 请求封装
+│   ├── client.ts              # API 请求封装（含 API Key 方法）
+│   └── types.ts               # API 响应类型
 ├── components/
 │   ├── CodeViewer.vue         # 代码高亮查看器
+│   ├── ConfirmDialog.vue      # 确认对话框
+│   ├── LoginDialog.vue        # 登录/注册对话框
 │   ├── MarkdownViewer.vue     # Markdown 渲染器
+│   ├── MermaidDiagram.vue     # Mermaid 图表渲染
 │   ├── FileTree.vue           # 文件目录树
-│   ├── TreeNodeItem.vue       # 递归树节点
-│   ├── ThemeToggle.vue        # 主题切换按钮
+│   ├── Pagination.vue         # 分页器
+│   ├── ThemeToggle.vue        # 主题切换
 │   ├── MobileFileDrawer.vue   # 移动端文件抽屉
 │   ├── MobileTocDrawer.vue    # 移动端 TOC 抽屉
-│   ├── MobileBottomBar.vue    # 移动端底部工具栏
-│   └── ui/                    # 基础 UI 组件
-│       ├── Button.vue
-│       ├── IconButton.vue
-│       ├── Toast.vue
-│       ├── Tooltip.vue
-│       └── LoadingSkeleton.vue
+│   └── MobileBottomBar.vue    # 移动端底部工具栏
 ├── composables/
 │   ├── useTheme.ts            # 主题管理
 │   ├── useShiki.ts            # Shiki 高亮单例
-│   ├── useEntry.ts            # 条目数据获取（含缓存）
+│   ├── useEntry.ts            # 条目数据获取
 │   └── useToast.ts            # Toast 通知
+├── stores/
+│   ├── auth.ts                # 认证状态（JWT, 三态）
+│   └── entry.ts               # 条目列表状态
 ├── styles/
 │   ├── variables.css          # 设计令牌
 │   ├── dark.css               # 暗色主题
-│   ├── light.css              # 亮色主题
-│   └── components.css         # 组件基础样式
+│   └── light.css              # 亮色主题
 ├── types/
-│   └── index.ts               # TypeScript 类型定义
+│   └── index.ts               # TypeScript 类型（Entry, User, ApiKey）
 ├── views/
-│   ├── EntryListView.vue      # 条目列表页
-│   └── EntryDetailView.vue    # 条目详情页
+│   ├── EntryListView.vue      # 条目列表页（All/Mine 标签页）
+│   ├── EntryDetailView.vue    # 条目详情页
+│   └── ApiKeyListView.vue     # API Key 管理页
+├── router.ts                  # 路由配置（注意：不是 router/index.ts）
 ├── App.vue
 └── main.ts
 ```
-
-**前端测试**: ✅ 98 测试通过（Vitest + Playwright 配置）
 
 ---
 
@@ -122,32 +109,30 @@ frontend-v3/src/
 
 ### 📋 规格文档 (`docs/specs/`)
 
-| 文件 | 说明 | 状态 | 版本 | 日期 |
-|------|------|------|------|------|
-| [spec-requirements.md](docs/specs/spec-requirements.md) | 需求规格 — 10 用户故事 | ✅ 定稿 | v2.0 | 2026-04-17 |
-| [spec-design.md](docs/specs/spec-design.md) | 技术设计 — FastAPI+SQLite+Vue3 | ✅ 定稿 | v2.0 | 2026-04-17 |
-| [spec-test-plan.md](docs/specs/spec-test-plan.md) | 测试计划 — 详细用例 | ✅ 定稿 | v3.0 | 2026-04-24 |
-| [spec-review-report.md](docs/specs/spec-review-report.md) | 三方评审综合报告 | ✅ 定稿 | v2.0 | 2026-04-17 |
-| [spec-design-review.md](docs/specs/spec-design-review.md) | 架构师评审意见 | ✅ 定稿 | - | 2026-04-17 |
-| [spec-test-review.md](docs/specs/spec-test-review.md) | QA 评审意见 | ✅ 定稿 | - | 2026-04-17 |
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| [spec-user-auth.md](docs/specs/spec-user-auth.md) | 用户认证规格 — JWT + 可见性 + API Key | ✅ 定稿 |
+| [spec-remote-cli.md](docs/specs/spec-remote-cli.md) | 远程 CLI 规格 | ✅ 定稿 |
 
-### 📝 实现与计划 (`docs/plans/`)
+> MVP 阶段规格文档（需求、设计、测试计划、评审）已归档至 `docs/archived/specs/`
 
-| 文件 | 说明 | 状态 | 版本 | 日期 |
-|------|------|------|------|------|
-| [impl-plan.md](docs/plans/impl-plan.md) | MVP 实现计划 — 16 任务 | ✅ 定稿 | v2 | 2026-04-18 |
-| [work-plan.md](docs/plans/work-plan.md) | **工作计划 — 软件工程化** | ✅ 已完成 | v1.0 | 2026-04-24 |
+### 📝 实现计划 (`docs/plans/`)
 
-### 📦 归档文档 (`docs/archived/`)
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| [impl-plan-admin-role.md](docs/plans/impl-plan-admin-role.md) | Admin 角色计划 | 🔄 部分完成 |
 
-> 已完成或废弃的过程文档，保留供参考
+> 已完成的计划（MVP, Auth, Remote CLI, API Keys, Work Plan）已归档至 `docs/archived/plans/`
 
-| 文件/目录 | 说明 | 归档日期 |
-|-----------|------|----------|
-| `impl-plan.restore.md` | v1 计划还原点 | 2026-05-08 |
-| `P0-T19/` ~ `P4-T19/` | 软件工程化检查点文档 | 2026-05-08 |
-| `superpowers/` | AI辅助设计历史文档 | 2026-05-08 |
-| `design/` | UI设计规范v1.0（已过时） | 2026-05-08 |
+### 🔍 评审 (`docs/reviews/`)
+
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| [ceo-review.md](docs/reviews/ceo-review.md) | CEO 战略评审 | 📖 战略建议仍有参考价值 |
+| [design-review.md](docs/reviews/design-review.md) | UI/UX 设计评审 | 📖 前端问题仍需关注 |
+| [dx-review.md](docs/reviews/dx-review.md) | DX 开发体验评审 | 📖 DX 改进建议仍适用 |
+
+> 已解决的评审（Eng 评审、预实现审计、API Key 评审 v1/v2）已归档至 `docs/archived/reviews/`
 
 ### 🔧 开发与调试 (`docs/process/`)
 
@@ -155,29 +140,29 @@ frontend-v3/src/
 |------|------|------|
 | [workflow.md](docs/process/workflow.md) | 开发工作流程 (P0-P4) | ✅ 定稿 |
 | [release.md](docs/process/release.md) | 发布流程 | ✅ 定稿 |
-| [debug-workflow.md](docs/process/debug-workflow.md) | **调试工作流程** | ✅ 定稿 |
+| [debug-workflow.md](docs/process/debug-workflow.md) | 调试工作流程 | ✅ 定稿 |
 | [debug-lessons.md](docs/process/debug-lessons.md) | 调试经验总结 | ✅ 定稿 |
-| [doc-sync-guide.md](docs/process/doc-sync-guide.md) | **文档同步指南** | ✅ 定稿 |
-| [doc-sync-pipeline.md](docs/process/doc-sync-pipeline.md) | **文档同步流水线机制** | ✅ 定稿 |
-| [incident-report-data-pollution.md](tests/archived/incident-report-data-pollution.md) | **数据污染事件报告** | ✅ 归档 |
-| [active-tasks.md](docs/process/active-tasks.md) | 活跃任务看板 | 🔄 使用中 |
+| [doc-sync-guide.md](docs/process/doc-sync-guide.md) | 文档同步指南 | ✅ 定稿 |
+| [doc-sync-pipeline.md](docs/process/doc-sync-pipeline.md) | 文档同步流水线 | ✅ 定稿 |
 | [multi-device-guide.md](docs/process/multi-device-guide.md) | 多设备开发指南 | ✅ 定稿 |
+| [active-tasks.md](docs/process/active-tasks.md) | 活跃任务看板 | 🔄 使用中 |
+
+### 📦 归档文档 (`docs/archived/`)
+
+| 子目录 | 说明 |
+|--------|------|
+| `specs/` | MVP 阶段规格（需求 v2.0、设计 v2.0、测试计划 v3.0、评审） |
+| `plans/` | 已完成的实现计划（MVP 16任务、Auth、Remote CLI、API Keys、Work Plan） |
+| `reviews/` | 已解决的评审（Eng 评审、预实现审计、API Key 评审 v1/v2） |
+| `P0-T19/` ~ `P4-T19/` | 软件工程化检查点文档 |
+| `superpowers/` | AI 辅助设计历史 |
+| `design/` | UI 设计规范 v1.0（已过时） |
 
 ### 🎨 前端技术文档 (`docs/frontend/`)
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| [svg-mermaid-patterns.md](docs/frontend/svg-mermaid-patterns.md) | SVG/Mermaid组件开发经验 | ✅ 定稿 |
-
-### 🔍 对抗评审 (`docs/reviews/`)
-
-| 文件 | 说明 | 评分 | 日期 |
-|------|------|------|------|
-| [ceo-review.md](docs/reviews/ceo-review.md) | CEO 战略评审 | 3.5/10 | 2026-04-18 |
-| [design-review.md](docs/reviews/design-review.md) | Design UI/UX 评审 | 3.2/10 | 2026-04-18 |
-| [eng-review.md](docs/reviews/eng-review.md) | Eng 架构评审 | 4 CRIT / 11 HIGH | 2026-04-18 |
-| [dx-review.md](docs/reviews/dx-review.md) | DX 开发体验评审 | 3.5/10 | 2026-04-18 |
-| [pre-impl-audit.md](docs/reviews/pre-impl-audit.md) | 编码前审查汇总 | 审查报告 | 2026-04-21 |
+| [svg-mermaid-patterns.md](docs/frontend/svg-mermaid-patterns.md) | SVG/Mermaid 组件开发经验 | ✅ 定稿 |
 
 ---
 
@@ -189,87 +174,43 @@ frontend-v3/src/
 | 数据库 | SQLite + SQLModel | 3.40+ |
 | 全文搜索 | SQLite FTS5 | 内置 |
 | 前端框架 | Vue | 3.4+ |
-| 构建工具 | Vite | 5.2+ |
-| 代码高亮 | Shiki | 1.6+ |
-| Markdown | markdown-it | 14.1+ |
-| 图标 | @iconify/vue | 4.1+ |
+| 构建工具 | Vite | 5.4+ |
+| 代码高亮 | Shiki | 1.10+ |
 | 测试（后端）| pytest | 8.0+ |
-| 测试（前端）| Vitest | 1.5+ |
-| E2E 测试 | Playwright | 1.43+ |
+| E2E 测试 | Playwright | 1.59+ |
 
 ---
 
 ## MVP 功能边界
 
-### 已实现（P0）
+### 已实现
 
 **后端**:
-- ✅ 条目 CRUD（创建、查看、删除）
-- ✅ 文件上传（内容直传、本地路径引用）
-- ✅ 文件下载（单文件、zip 打包）
-- ✅ 目录结构保留（src/main.py → src/main.py）
-- ✅ FTS5 全文搜索
+- ✅ 条目 CRUD（创建、查看、更新、删除）
+- ✅ 文件上传（内容直传、本地路径引用、目录扫描）
+- ✅ FTS5 全文搜索 + 标签过滤
 - ✅ 资源限制（文件大小、条目文件数、总存储）
-- ✅ 安全机制（路径遍历防护、黑名单、XSS 防护）
-- ✅ CLI 工具（serve/create/list/get/delete）
-- ✅ **Remote CLI 模式（v0.1.25）** - CLI 作为 HTTP 客户端连接远程服务端
-- ✅ 健康检查（/health）
+- ✅ 安全机制（路径遍历防护、allowlist、symlink 检测、XSS 防护）
+- ✅ CLI 工具（serve/create/list/get/delete/user/login/apikey/config/service）
+- ✅ 远程 CLI 模式
+- ✅ 用户认证（JWT、bcrypt、注册/登录/登出）
+- ✅ 条目可见性（public/private、owner_id）
+- ✅ Admin 角色（首用户自动 admin、promote/demote）
+- ✅ API Key 管理（pv_ 前缀、HMAC-SHA256、过期时间、CLI 管理）
+- ✅ All/Mine 条目筛选
 
 **前端**:
-- ✅ 条目详情页（代码高亮、Markdown 渲染、目录树）
-- ✅ 条目列表页（列表 + 搜索 + 分页）
+- ✅ 条目详情页（代码高亮、Markdown 渲染、目录树、Mermaid）
+- ✅ 条目列表页（列表 + 搜索 + 分页 + All/Mine 标签页）
+- ✅ 用户认证 UI（登录/注册对话框、用户菜单）
+- ✅ API Key 管理页（创建/列表/撤销/复制）
+- ✅ 所有者操作（可见性切换、删除）
 - ✅ 主题切换（暗色/亮色）
-- ✅ 移动端完整适配（抽屉菜单、底部工具栏）
-- ✅ 复制/下载按钮
-- ✅ URL 行号高亮（#L5-L10）
-- ✅ URL 文件选择（?file=main.py）
+- ✅ 移动端完整适配
+- ✅ URL 行号高亮 + 文件深链接
 
-### 明确不在 MVP（P1/P2）
+### 未实现（P1/P2）
 
-- ❌ 更新条目（可用删除+重建替代）
-- ❌ MCP Server（P1 实现）
-- ❌ 过期自动清理（P1 实现）
-- ✅ ~~Mermaid 图表渲染~~（v0.1.16 已实现，v0.1.17 修复容器问题）
-- ❌ 嵌入式分享 iframe（P1 实现）
-
----
-
-## 评审修订追踪
-
-v2 计划已包含以下修订：
-
-🔴 **CRITICAL (7)**: 文件内容端点 / allowlist / API key / 符号链接 / path遍历 / get_engine / EntryCreate  
-🟠 **HIGH (8)**: DI app.state / 模块级app / conftest Task0 / Shiki单例 / FileTree树 / FOUC主题 / 事务 / 静态文件  
-🟡 **MEDIUM+LOW (5)**: .gitignore+Makefile / 201状态码 / URL行号 / expires_in边界 / created_at默认值
-
----
-
-## Git 历史
-
-| Commit | 说明 | 日期 |
-|--------|------|------|
-| `HEAD` | feat: Remote CLI mode + API command (v0.1.25) | 2026-05-16 |
-| `...` | fix: archive old E2E tests to prevent production data pollution | 2026-05-08 |
-| `048010c` | fix: localize all external resources + bump version to v0.1.22 | 2026-05-08 |
-| `15e4fc0` | fix: mobile code viewer height to fill screen | 2026-05-08 |
-| `33a12c2` | feat: localize all external resources for offline usage | 2026-05-08 |
-| `16dd8c2` | feat: add config command and persistent base_url | 2026-05-08 |
-| `f3a49f9` | fix: Mermaid图表容器和切换修复 (v0.1.17) | 2026-05-06 |
-| `1da0aa1` | fix: 动态高度计算和静态文件路径修复 | 2026-05-06 |
-| `193cfbd` | auto sync: 前端 Task 16b/16c 核心组件 | 2026-04-23 |
-| `0c9ff3c` | feat(frontend): Task 15 - UI Components | 2026-04-23 |
-| `240113e` | feat(frontend): Task 14 - Vue 3 + Vite | 2026-04-22 |
-| `ab1c8be` | feat(backend): Task 8 - File Service | 2026-04-21 |
-| `f0feddf` | docs: pre-implementation audit | 2026-04-21 |
-| `ece3c0e` | v2.0 文档评审修正 | 2026-04-17 |
-
----
-
-## 下一步行动
-
-所有 Phase 已完成，项目已就绪：
-
-- ✅ 代码：前后端完整实现
-- ✅ 测试：98 个单元测试通过
-- ✅ 文档：README、DEPLOYMENT、CHANGELOG 完整
-- 🚀 可选：PyPI 发布、服务器部署
+- ❌ MCP Server
+- ❌ 条目编辑 UI（API 已支持 PATCH）
+- ❌ 嵌入式分享 iframe

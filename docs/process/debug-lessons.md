@@ -274,7 +274,71 @@ lsof -p $(pgrep -f "uvicorn.*8888") | grep peekview.db
 
 ---
 
-### 教训 6: 网络不稳定时的发布流程
+### 教训 6: dev-server.sh 必须使用正确的 Python 版本
+
+**问题**: `scripts/dev-server.sh` 使用 `python3 -m uvicorn` 启动调试服务，但 `python3` 可能解析到 hermes venv 的 Python 3.11，而 peekview 要求 Python 3.12+
+
+**根本原因**:
+- `which python3` 返回 hermes venv 的 Python 3.11
+- Python 3.11 没有安装 peekview（也不兼容），实际运行的是 pipx 安装的旧版本
+- 旧版本没有 auth 端点，导致 E2E 测试失败
+
+**修复**:
+```bash
+# dev-server.sh 中自动检测正确的 Python
+PYTHON=""
+for cmd in python3.12 python3.13 python3; do
+    if command -v "$cmd" &>/dev/null; then
+        if "$cmd" -c "import peekview" 2>/dev/null; then
+            PYTHON="$cmd"
+            break
+        fi
+    fi
+done
+```
+
+**验证**:
+```bash
+# 启动后检查 Python 版本和 peekview 版本
+curl -s http://127.0.0.1:8888/health | jq '.version'
+# 应该是本地开发版本（如 0.1.25），而非 pipx 旧版本
+```
+
+---
+
+### 教训 7: Playwright E2E 测试必须设置 BASE_URL
+
+**问题**: 直接运行 `npx playwright test` 时，`playwright.config.ts` 的 `baseURL` 默认为 `http://localhost:5173`（Vite 开发服务器），而非调试服务的 `http://127.0.0.1:8888`
+
+**根本原因**:
+- `playwright.config.ts` 中 `baseURL: process.env.BASE_URL || 'http://localhost:5173'`
+- `page.request.post('/api/v1/entries', ...)` 使用 `baseURL` 发送请求
+- 如果没有 Vite 开发服务器运行，请求失败或打到错误的服务
+
+**修复**:
+```bash
+# 使用 make debug-test（自动设置 BASE_URL）
+make debug-test
+
+# 或手动设置
+BASE_URL=http://127.0.0.1:8888 npx playwright test
+```
+
+---
+
+### 教训 8: E2E 认证测试必须使用唯一用户名
+
+**问题**: 认证 E2E 测试使用硬编码用户名（如 `e2euser`），多次运行后注册失败（用户名已存在）
+
+**修复**:
+```typescript
+// 使用时间戳 + 随机字符串确保唯一
+const uniqueUser = `e2e_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+```
+
+---
+
+### 教训 9: 网络不稳定时的发布流程
 
 **问题**: `git push` 和 PyPI 上传可能因网络问题失败
 
@@ -316,3 +380,74 @@ make publish
 ```
 
 ---
+
+## 前端路由文件陷阱
+
+### 教训 10: 修改路由时必须确认正确的文件
+
+**问题**: 添加 API Key 管理页路由后，前端构建成功但 `/settings/apikeys` 页面始终显示首页，组件不在构建输出中
+
+**原因**:
+- 项目存在两个路由文件：`src/router.ts` 和 `src/router/index.ts`
+- `main.ts` 导入的是 `./router.ts`（实际使用）
+- 路由被添加到了 `src/router/index.ts`（未被导入）
+- Vite 构建正常，但路由定义根本不参与编译
+
+**解决**:
+- 始终修改 `src/router.ts`（`main.ts` 实际导入的文件）
+- 删除未使用的 `src/router/index.ts` 避免混淆
+- 构建后验证：`grep -c "apikey-page" dist/assets/*.js` 确认组件在输出中
+
+**检查点**:
+```bash
+# 添加新路由后，验证组件出现在构建输出中
+npm run build
+grep -c "your-css-class" dist/assets/*.js
+
+# 确认 main.ts 导入的是哪个路由文件
+grep "router" src/main.ts
+```
+
+---
+
+## SQLite 时区处理
+
+### 教训 11: SQLite 存储的 datetime 是 offset-naive
+
+**问题**: `verify_api_key()` 中 `api_key.expires_at < datetime.now(timezone.utc)` 抛出 TypeError（offset-naive vs offset-aware 比较）
+
+**原因**:
+- SQLite 不存储时区信息，所有 datetime 列返回 offset-naive 的 Python datetime
+- 代码使用 `datetime.now(timezone.utc)` 生成 offset-aware datetime
+- 直接比较会 TypeError
+
+**解决**:
+- 从 DB 读取的 datetime，统一加 `.replace(tzinfo=timezone.utc)` 转为 aware
+- 写入 DB 的 datetime，用 `.replace(tzinfo=None)` 转为 naive
+- SQL WHERE 子句中的比较，两端都用 naive datetime
+
+```python
+# 读取时转为 aware
+if api_key.expires_at and api_key.expires_at.tzinfo is None:
+    expires_at = api_key.expires_at.replace(tzinfo=timezone.utc)
+
+# 写入时转为 naive
+api_key.last_used_at = now.replace(tzinfo=None)
+```
+
+---
+
+## 首用户 Admin 自动提升
+
+### 教训 12: 测试中注意首用户 is_admin=True
+
+**问题**: `test_cannot_revoke_others_key` 失败——user_a 应该无法撤销 user_b 的 key，但返回 200
+
+**原因**:
+- 系统自动给首个注册用户设置 `is_admin=True`
+- 测试先注册 user_a（成为 admin），再注册 user_b
+- user_a 作为 admin 有权撤销 user_b 的 key
+
+**解决**:
+- 测试中先注册 "admin_user"，再注册实际测试用户
+- 或在测试断言中考虑 admin 权限

@@ -52,7 +52,7 @@ pip install -e ".[test]"
 
 # 验证安装
 peekview --version
-# 输出: peekview, version 0.1.4
+# 输出: peekview, version 0.1.26
 ```
 
 ### 前端构建
@@ -134,10 +134,10 @@ peekview serve
 
 ```bash
 # SQLite 数据库位置
-~/.peekview/peek.db
+~/.peekview/peekview.db
 
 # 使用 sqlite3 命令行查看
-sqlite3 ~/.peekview/peek.db
+sqlite3 ~/.peekview/peekview.db
 
 # 常用查询
 sqlite> .tables
@@ -160,10 +160,22 @@ cat ~/.peekview/config.yaml  # 如存在
 ```bash
 # 开发时常用的环境变量（注意 __ 分隔符用于嵌套配置）
 export PEEKVIEW_STORAGE__DATA_DIR=/tmp/peekview/data
-export PEEKVIEW_STORAGE__DB_PATH=/tmp/peekview/peek.db
+export PEEKVIEW_STORAGE__DB_PATH=/tmp/peekview/peekview.db
 export PEEKVIEW_SERVER__PORT=8080
 export PEEKVIEW_SERVER__HOST=127.0.0.1
 export PEEKVIEW_SERVER__CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
+
+# 认证配置
+export PEEKVIEW_AUTH__SECRET_KEY=dev-secret-key
+export PEEKVIEW_AUTH__ALLOW_ANONYMOUS_CREATE=true
+
+# 资源限制
+export PEEKVIEW_LIMITS__MAX_FILE_SIZE=10485760
+export PEEKVIEW_LIMITS__MAX_ENTRY_FILES=50
+
+# 清理和日志
+export PEEKVIEW_CLEANUP__INTERVAL_SECONDS=0    # 禁用自动清理
+export PEEKVIEW_LOGGING__LEVEL=DEBUG
 ```
 
 或使用 config.yaml：
@@ -177,7 +189,7 @@ server:
   port: 8080
 storage:
   data_dir: /tmp/peekview/data
-  db_path: /tmp/peekview/peek.db
+  db_path: /tmp/peekview/peekview.db
 ```
 
 ---
@@ -265,7 +277,7 @@ peekview serve
 
 ```bash
 # 停止服务器后删除数据库
-rm ~/.peekview/peek.db
+rm ~/.peekview/peekview.db
 rm -rf ~/.peekview/data/default/*
 
 # 重新启动，数据库会自动初始化
@@ -339,9 +351,9 @@ sudo sysctl -p
 pkill -f "peekview serve"
 
 # 或删除锁文件（如果存在）
-rm ~/.peekview/peek.db-journal
-rm ~/.peekview/peek.db-wal
-rm ~/.peekview/peek.db-shm
+rm ~/.peekview/peekview.db-journal
+rm ~/.peekview/peekview.db-wal
+rm ~/.peekview/peekview.db-shm
 ```
 
 ### Q5: 前端样式未更新
@@ -367,7 +379,7 @@ Ctrl + F5
 | ruff | 代码检查 | `cd backend && make lint` |
 | Vitest | 前端单元测试 | `cd frontend-v3 && npm run test` |
 | Playwright | E2E 测试 | `cd frontend-v3 && npm run test:e2e` |
-| sqlite3 | 数据库查询 | `sqlite3 ~/.peekview/peek.db` |
+| sqlite3 | 数据库查询 | `sqlite3 ~/.peekview/peekview.db` |
 | curl | API 测试 | `curl http://localhost:8080/api/v1/entries` |
 
 ---
@@ -391,4 +403,4 @@ alias pv-build='cd /home/kity/lab/projects/peekview/frontend-v3 && npm run build
 
 ---
 
-最后更新: 2026-04-24
+最后更新: 2026-05-17

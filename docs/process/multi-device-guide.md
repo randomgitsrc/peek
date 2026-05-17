@@ -32,15 +32,16 @@ git remote -v
 cd backend
 pip install -e ".[test]"
 # 验证
-make test  # 应显示 292 passed
+make test  # 应显示 393 passed
 ```
 
 **前端（Node.js 18+）:**
 ```bash
 cd frontend-v3
 npm install
-# 验证
-npm run test  # 应显示 100 passed
+# 验证 E2E（需先启动调试服务）
+make debug-start  # 从项目根目录
+make debug-test   # 52 E2E tests
 ```
 
 ---
@@ -403,4 +404,4 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 
 ---
 
-最后更新: 2026-04-24
+最后更新: 2026-05-17

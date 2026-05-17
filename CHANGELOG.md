@@ -7,6 +7,51 @@
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-05-17
+
+### 新增
+
+- **API Key 管理系统** — 用户级 API Key，支持自动化和 CLI 远程操作
+  - `pv_` 前缀 + `secrets.token_urlsafe(24)` 生成，HMAC-SHA256 哈希存储
+  - 用户级 API Key = JWT 等价权限（正常所有权检查）
+  - 支持过期时间（7d/30d/90d/永不）
+  - 每用户最多 10 个活跃 Key
+  - 撤销、清理过期 Key 功能
+
+- **CLI apikey 命令组** — 远程 API Key 管理
+  - `peekview apikey create <name> [--expires 30d]`
+  - `peekview apikey list`
+  - `peekview apikey revoke <key_id>`
+  - `peekview apikey cleanup`
+
+- **API Key 前端管理页** — `/settings/apikeys`
+  - 创建 Key 对话框（名称 + 过期时间选择）
+  - Key 列表展示（前缀、过期、最后使用时间）
+  - 撤销确认、清理过期 Key
+  - 创建后显示完整 Key（仅一次）+ 复制按钮
+
+- **All/Mine 标签页筛选** — 条目列表按所有权筛选
+  - 已登录用户：All（所有公开 + 自己私有）/ Mine（仅自己条目）
+  - 匿名用户：不显示标签页
+
+- **Admin 角色基础功能**
+  - 首个注册用户自动成为管理员
+  - `peekview user promote/demote` 命令
+  - 管理员可撤销任何用户的 API Key
+
+### 变更
+
+- 全局 API Key 中间件：`pv_` 前缀 Key 透传到 JWT 认证流程
+- 条目创建：新增 `allow_anonymous_create` 配置项（默认 true）
+- 条目列表：新增 `owner` 查询参数（`owner=me` 筛选自己的条目）
+- 登录成功提示新增 API Key 使用建议
+
+### 测试
+
+- 后端：新增 `test_apikey.py`（26 测试）
+- E2E：新增 All/Mine 标签页测试（3 测试）+ API Key 测试（5 测试）
+- 总计：393 后端测试 + 52 E2E 测试通过
+
 ## [0.1.25] - 2026-05-16
 
 ### 新增

@@ -64,7 +64,7 @@ pip install peekview
 ln -s ~/.venvs/peekview/bin/peekview ~/.local/bin/peekview
 ```
 
-### 方式二：从源码安装（当前可用）
+### 方式三：从源码安装（当前可用）
 
 ```bash
 # 1. 克隆仓库
@@ -211,7 +211,7 @@ Type=simple
 User=www-data
 WorkingDirectory=/opt/peek
 Environment=PEEKVIEW_STORAGE__DATA_DIR=/var/peek/data
-Environment=PEEKVIEW_STORAGE__DB_PATH=/var/peek/peek.db
+Environment=PEEKVIEW_STORAGE__DB_PATH=/var/peek/peekview.db
 Environment=PEEKVIEW_SERVER__HOST=0.0.0.0
 Environment=PEEKVIEW_SERVER__PORT=8080
 ExecStart=/opt/peek/venv/bin/peekview serve
@@ -269,16 +269,27 @@ server {
 
 | 变量 | 默认值 | 说明 | 示例 |
 |------|--------|------|------|
-| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 | `/var/peek/data` |
-| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 | `/var/peek/peek.db` |
-| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径 | `/home/user/docs,/data` |
 | `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | 服务绑定地址 | `0.0.0.0` |
 | `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 | `80` |
 | `PEEKVIEW_SERVER__BASE_URL` | - | 外部访问 URL（用于反向代理） | `https://example.com` |
-| `PEEKVIEW_SERVER__API_KEY` | - | API 认证密钥 | `your-secret-key` |
+| `PEEKVIEW_SERVER__API_KEY` | - | 全局 API 认证密钥（创建 ownerless 条目） | `your-secret-key` |
 | `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 | `https://yourdomain.com` |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 | `/var/peek/data` |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peekview.db` | SQLite 数据库路径 | `/var/peek/peekview.db` |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径 | `/home/user/docs,/data` |
+| `PEEKVIEW_AUTH__SECRET_KEY` | - | JWT 签名密钥（空=自动生成） | `your-jwt-secret` |
+| `PEEKVIEW_AUTH__TOKEN_EXPIRE_DAYS` | `7` | JWT Token 有效期（天） | `30` |
+| `PEEKVIEW_AUTH__ALLOW_REGISTRATION` | `true` | 是否允许新用户注册 | `false` |
+| `PEEKVIEW_AUTH__ALLOW_ANONYMOUS_CREATE` | `true` | 是否允许匿名创建条目 | `false` |
+| `PEEKVIEW_LIMITS__MAX_FILE_SIZE` | `10485760` | 单文件最大大小（10MB） | `20971520` |
+| `PEEKVIEW_LIMITS__MAX_ENTRY_FILES` | `50` | 单条目最大文件数 | `100` |
+| `PEEKVIEW_LIMITS__MAX_PER_PAGE` | `50` | 每页最大条目数 | `100` |
+| `PEEKVIEW_CLEANUP__CHECK_ON_START` | `true` | 启动时检查过期条目 | `false` |
+| `PEEKVIEW_CLEANUP__INTERVAL_SECONDS` | `3600` | 清理间隔（0=禁用） | `7200` |
+| `PEEKVIEW_LOGGING__LEVEL` | `INFO` | 日志级别 | `DEBUG` |
 | `PEEKVIEW_REMOTE__URL` | - | 远程服务端地址（远程 CLI 模式）| `https://peek.example.com` |
-| `PEEKVIEW_REMOTE__API_KEY` | - | 远程 API 认证密钥 | `sk-your-key` |
+| `PEEKVIEW_REMOTE__API_KEY` | - | 远程 API 认证密钥 | `pv_your-key` |
+| `PEEKVIEW_REMOTE__TOKEN` | - | 远程 JWT 用户 token | - |
 | `PEEKVIEW_REMOTE__TIMEOUT` | `30` | 远程请求超时（秒）| `60` |
 | `PEEKVIEW_REMOTE__VERIFY_SSL` | `true` | 远程 SSL 证书校验 | `false` |
 
@@ -295,19 +306,29 @@ server:
   base_url: https://peek.yourdomain.com
 storage:
   data_dir: /var/peek/data
-  db_path: /var/peek/peek.db
+  db_path: /var/peek/peekview.db
   allowed_paths:
     - /home/user/documents
+auth:
+  secret_key: ""  # 空=自动生成
+  token_expire_days: 7
+  allow_registration: true
+  allow_anonymous_create: true
+limits:
+  max_file_size: 10485760
+  max_entry_files: 50
+  max_per_page: 50
 remote:
   url: https://peek.yourdomain.com
-  api_key: sk-your-api-key
+  api_key: pv_your-api-key
   timeout: 30
   verify_ssl: true
 ```
 
 **Remote CLI 配置说明**（v0.1.25+）：
 - `remote.url`: 远程服务端地址，设置后 CLI 自动使用远程模式
-- `remote.api_key`: API 认证密钥（如果服务端启用了 `PEEKVIEW_SERVER__API_KEY`）
+- `remote.api_key`: 用户级 API Key（`pv_` 前缀）或全局 API Key
+- `remote.token`: JWT 用户认证 token（通过 `peekview login` 获取）
 - `remote.timeout`: HTTP 请求超时时间（秒）
 - `remote.verify_ssl`: 是否验证 SSL 证书（自签名证书可设为 `false`）
 
@@ -316,7 +337,7 @@ remote:
 ```bash
 # 数据和数据库
 PEEKVIEW_STORAGE__DATA_DIR=/var/peek/data
-PEEKVIEW_STORAGE__DB_PATH=/var/peek/peek.db
+PEEKVIEW_STORAGE__DB_PATH=/var/peek/peekview.db
 
 # 网络配置
 PEEKVIEW_SERVER__HOST=0.0.0.0
@@ -411,7 +432,52 @@ peekview delete monthly-report-2024
 peekview delete monthly-report-2024 --force
 ```
 
-#### 5. Remote CLI 模式（v0.1.25+）
+#### 5. 用户管理
+
+```bash
+# 创建用户（提示输入密码）
+peekview user create <username>
+
+# 列出所有用户
+peekview user list
+
+# 提升为管理员
+peekview user promote <username>
+
+# 降级管理员
+peekview user demote <username>
+
+# 登录远程服务器（获取 JWT token）
+peekview login --remote-url https://peek.example.com --username <user>
+```
+
+#### 6. API Key 管理（v0.1.26+）
+
+```bash
+# 创建 API Key
+peekview apikey create "CI Bot"
+
+# 带过期时间
+peekview apikey create "Temp Key" --expires 30d
+
+# 列出所有 API Key
+peekview apikey list
+
+# 撤销 API Key
+peekview apikey revoke <key_id>
+
+# 清理过期 Key
+peekview apikey cleanup
+```
+
+**API Key 说明**：
+- 格式：`pv_` 前缀 + 24 字符 token
+- 用户级 API Key = JWT 等价权限（正常所有权检查）
+- 全局 API Key (`PEEKVIEW_SERVER__API_KEY`) 创建 ownerless 条目
+- 每用户最多 10 个活跃 Key
+- 支持过期时间：7d、30d、90d、永不
+
+#### 7. Remote CLI 模式（v0.1.25+）
 
 Remote CLI 模式允许你从其他机器通过 CLI 连接远程 PeekView 服务端：
 
@@ -476,14 +542,47 @@ curl -X POST http://localhost:8080/api/v1/entries \
     "files": [{"filename": "test.py", "content": "print(1)"}]
   }'
 
+# 创建私有条目（需 JWT）
+curl -X POST http://localhost:8080/api/v1/entries \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt>" \
+  -d '{"summary": "Private", "is_public": false, "files": [...]}'
+
+# 使用 API Key 创建条目
+curl -X POST http://localhost:8080/api/v1/entries \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: pv_your-key" \
+  -d '{"summary": "Via API Key", "files": [...]}'
+
 # 获取条目列表
 curl http://localhost:8080/api/v1/entries
 
-# 获取条目详情
-curl http://localhost:8080/api/v1/entries/{slug}
+# 筛选自己的条目
+curl -H "Authorization: Bearer <jwt>" \
+  "http://localhost:8080/api/v1/entries?owner=me"
 
 # 搜索
 curl "http://localhost:8080/api/v1/entries?q=python"
+
+# 用户注册
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user1", "password": "pass123"}'
+
+# 用户登录
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user1", "password": "pass123"}'
+
+# 创建 API Key（需 JWT）
+curl -X POST http://localhost:8080/api/v1/apikeys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt>" \
+  -d '{"name": "CI Bot", "expires_in": "30d"}'
+
+# 列出 API Key
+curl -H "Authorization: Bearer <jwt>" \
+  http://localhost:8080/api/v1/apikeys
 
 # 删除条目
 curl -X DELETE http://localhost:8080/api/v1/entries/{slug}
@@ -550,7 +649,7 @@ rm -rf ~/.peekview
 | 路径 | 内容 | 是否必须清理 |
 |------|------|-------------|
 | `~/.peekview/data/` | 上传的文件 | 可选 |
-| `~/.peekview/peek.db` | SQLite 数据库 | 可选 |
+| `~/.peekview/peekview.db` | SQLite 数据库 | 可选 |
 | 安装目录 | 程序文件 | 是 |
 | 虚拟环境 | Python 依赖 | 是 |
 
@@ -621,7 +720,7 @@ cp -r dist ../backend/peekview/static
 peekview serve  # 前台运行查看报错
 
 # 检查数据库权限
-ls -la ~/.peekview/peek.db
+ls -la ~/.peekview/peekview.db
 ```
 
 ### 数据备份

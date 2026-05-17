@@ -4,7 +4,7 @@
 
 Agent（AI）产出 → PeekView 格式化 → 人类友好查看
 
-[![Version](https://img.shields.io/badge/version-0.1.25-blue.svg)](https://github.com/randomgitsrc/peekview/releases)
+[![Version](https://img.shields.io/badge/version-0.1.26-blue.svg)](https://github.com/randomgitsrc/peekview/releases)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3.4+-green.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -18,10 +18,6 @@ Agent（AI）产出 → PeekView 格式化 → 人类友好查看
 **推荐：使用 pipx 安装（隔离环境，无依赖冲突）**
 
 ```bash
-# 安装 pipx（如果尚未安装）
-# macOS: brew install pipx && pipx ensurepath
-# Ubuntu/Debian: sudo apt install pipx && pipx ensurepath
-
 pipx install peekview
 ```
 
@@ -60,7 +56,9 @@ peekview serve --host 0.0.0.0 --port 8080
 - 🔍 **全文搜索** - SQLite FTS5 高性能搜索
 - 📂 **多文件支持** - 单条目多文件，文件树形目录展示
 - 📤 **文件上传** - 支持内容直传、本地路径引用、批量上传
-- 🌐 **REST API** - 完整的 RESTful CRUD 接口（rest-api），支持 API Key 认证
+- 🌐 **REST API** - 完整的 RESTful CRUD 接口，支持 API Key 认证
+- 🔐 **用户认证** - JWT 用户注册/登录，私有条目，所有者权限控制
+- 🔑 **API Key 管理** - 用户级 API Key（`pv_` 前缀），支持过期时间，CLI 远程管理
 - 🌓 **主题切换** - 深色/浅色模式，自动跟随系统
 - 📱 **移动端适配** - 响应式设计，底部工具栏
 - 🔗 **URL 友好** - 支持 slug、文件参数、行号高亮
@@ -82,45 +80,50 @@ peekview create src/*.py -s "Python project" -t python -t cli
 # 从标准输入
 echo "print('hello')" | peekview create -s "From stdin" --from-stdin
 
-# 自定义 slug
-peekview create README.md -s "Documentation" --slug docs
+# 创建私有条目
+peekview create file.py -s "Private" --visibility private
 ```
 
-### 查看条目
+### 查看与管理条目
 
 ```bash
-# 查看详情
-peekview get my-entry
-
-# 列出入库（支持分页）
-peekview list
-peekview list --page 2 --per-page 50
-
-# 搜索（FTS5 全文搜索）
-peekview list -q "python function"
-
-# 按标签过滤
-peekview list -t python -t cli
+peekview get my-entry                       # 查看详情
+peekview list                                # 列出入库
+peekview list -q "python function"           # FTS5 全文搜索
+peekview list -t python -t cli               # 按标签过滤
+peekview delete my-entry                     # 删除（需确认）
 ```
 
-### 删除条目
+### 用户管理
 
 ```bash
-# 删除（会要求确认）
-peekview delete my-entry
+peekview user create <username>              # 创建用户
+peekview user list                           # 列出用户
+peekview user promote <username>             # 提升为管理员
+peekview user demote <username>              # 降级管理员
+```
 
-# 强制删除
-peekview delete my-entry --force
+### 远程认证
+
+```bash
+peekview login --remote-url <url> --username <user>  # 登录远程服务器
+```
+
+### API Key 管理
+
+```bash
+peekview apikey create "CI Bot"              # 创建 API Key
+peekview apikey create "Temp" --expires 30d  # 带过期时间
+peekview apikey list                         # 列出所有 Key
+peekview apikey revoke <key_id>              # 撤销 Key
+peekview apikey cleanup                      # 清理过期 Key
 ```
 
 ### API 文档
 
 ```bash
-# 查看所有 API 端点
-peekview api endpoints
-
-# 查看 OpenAPI/Swagger 文档地址
-peekview api openapi
+peekview api endpoints                       # 列出所有 API 端点
+peekview api openapi                         # 显示 OpenAPI 文档地址
 ```
 
 ---
@@ -128,13 +131,6 @@ peekview api openapi
 ## 远程 CLI 模式
 
 从 v0.1.25 开始，PeekView 支持远程 CLI 模式。你可以在一台机器上运行服务端，从其他机器通过 CLI 创建和管理条目。
-
-### 场景示例
-
-```
-机器 A (服务端): peekview serve --base-url https://peek.example.com
-机器 B (客户端): peekview create file.txt -s "My code"  →  上传到机器 A
-```
 
 ### 配置远程服务端
 
@@ -144,47 +140,22 @@ peekview api openapi
 # ~/.peekview/config.yaml
 remote:
   url: https://peek.example.com
-  api_key: sk-your-api-key          # 如果服务端启用了 API Key 认证
-  timeout: 60                       # 请求超时（秒）
-  verify_ssl: true                  # SSL 证书校验
-```
-
-配置后，所有 CLI 命令会自动使用远程模式：
-
-```bash
-peekview create file.txt -s "My code"     # 自动上传到远程服务端
-peekview list                              # 列出远程服务端的所有条目
-peekview get my-entry                      # 获取远程条目详情
-peekview delete my-entry                   # 删除远程条目
+  api_key: pv_your-api-key           # 用户级 API Key
+  timeout: 60
+  verify_ssl: true
 ```
 
 **方式 2：环境变量**
 
 ```bash
 export PEEKVIEW_REMOTE__URL=https://peek.example.com
-export PEEKVIEW_REMOTE__API_KEY=sk-your-api-key
-
-peekview create file.txt -s "My code"
+export PEEKVIEW_REMOTE__API_KEY=pv_your-api-key
 ```
 
 **方式 3：命令行参数（临时）**
 
 ```bash
-# 临时指定远程服务端（不影响其他命令）
 peekview create file.txt -s "My code" --remote-url https://peek.example.com
-peekview list --remote-url https://peek.example.com
-```
-
-### 显式使用本地模式
-
-如果配置了远程服务端，但想临时使用本地模式：
-
-```bash
-# 方式 1：空字符串显式禁用
-peekview create file.txt -s "Local only" --remote-url ""
-
-# 方式 2：移除配置文件中的 remote.url
-peekview config set remote.url ""
 ```
 
 ### 远程模式限制
@@ -193,128 +164,67 @@ peekview config set remote.url ""
 - **不支持 local_path**：远程模式无法访问服务端本地文件系统
 - **目录扫描**：在客户端本地完成扫描后上传文件内容
 
-### 配置命令
-
-```bash
-# 设置远程服务端地址
-peekview config set remote.url https://peek.example.com
-
-# 设置 API Key
-peekview config set remote.api_key sk-your-api-key
-
-# 设置超时时间
-peekview config set remote.timeout 60
-
-# 查看当前配置
-peekview config get remote.url
-peekview config list
-```
-
 ---
 
 ## 配置
 
-### 方式 1：环境变量（最高优先级）
-
-适合 Docker、CI/CD、临时覆盖或敏感信息：
+### 环境变量（最高优先级）
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
-| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 |
-| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
 | `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | 服务绑定地址 |
 | `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 |
-| `PEEKVIEW_SERVER__API_KEY` | - | API 认证密钥（可选） |
+| `PEEKVIEW_SERVER__BASE_URL` | `""` | 外部 URL（空=自动检测） |
+| `PEEKVIEW_SERVER__API_KEY` | `""` | 全局 API 认证密钥（空=无认证） |
 | `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
-| `PEEKVIEW_REMOTE__URL` | - | 远程服务端地址（远程 CLI 模式） |
-| `PEEKVIEW_REMOTE__API_KEY` | - | 远程 API 认证密钥 |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peekview.db` | SQLite 数据库路径 |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
+| `PEEKVIEW_AUTH__SECRET_KEY` | `""` | JWT 签名密钥（空=自动生成） |
+| `PEEKVIEW_AUTH__TOKEN_EXPIRE_DAYS` | `7` | JWT Token 有效期（天） |
+| `PEEKVIEW_AUTH__ALLOW_REGISTRATION` | `true` | 是否允许新用户注册 |
+| `PEEKVIEW_AUTH__ALLOW_ANONYMOUS_CREATE` | `true` | 是否允许匿名创建条目 |
+| `PEEKVIEW_LIMITS__MAX_FILE_SIZE` | `10485760` | 单文件最大大小（10MB） |
+| `PEEKVIEW_LIMITS__MAX_ENTRY_FILES` | `50` | 单条目最大文件数 |
+| `PEEKVIEW_LIMITS__MAX_SUMMARY_LENGTH` | `500` | 摘要最大长度 |
+| `PEEKVIEW_LIMITS__MAX_PER_PAGE` | `50` | 每页最大条目数 |
+| `PEEKVIEW_CLEANUP__CHECK_ON_START` | `true` | 启动时检查过期条目 |
+| `PEEKVIEW_CLEANUP__INTERVAL_SECONDS` | `3600` | 清理间隔（0=禁用） |
+| `PEEKVIEW_LOGGING__LEVEL` | `INFO` | 日志级别 |
+| `PEEKVIEW_REMOTE__URL` | `""` | 远程服务端地址 |
+| `PEEKVIEW_REMOTE__API_KEY` | `""` | 远程 API Key |
+| `PEEKVIEW_REMOTE__TOKEN` | `""` | 远程 JWT Token |
 | `PEEKVIEW_REMOTE__TIMEOUT` | `30` | 远程请求超时（秒） |
-| `PEEKVIEW_REMOTE__VERIFY_SSL` | `true` | 远程 SSL 证书校验 |
+| `PEEKVIEW_REMOTE__VERIFY_SSL` | `true` | SSL 证书校验 |
 
 **注意**：`__` 分隔符用于访问嵌套配置（如 `storage.data_dir` → `PEEKVIEW_STORAGE__DATA_DIR`）
 
-也可使用 `.env` 文件：
+### Config 文件（持久化配置）
 
-```bash
-PEEKVIEW_STORAGE__DATA_DIR=/var/peek/data
-PEEKVIEW_STORAGE__DB_PATH=/var/peek/peek.db
-PEEKVIEW_SERVER__HOST=0.0.0.0
-PEEKVIEW_SERVER__PORT=8080
-PEEKVIEW_SERVER__API_KEY=your-secret-key
-```
-
-### 方式 2：Config 文件（持久化配置）
-
-适合保存常用设置，如自定义域名：
-
-```bash
+```yaml
 # ~/.peekview/config.yaml
 server:
   base_url: https://peek.example.com
   port: 8080
 storage:
   data_dir: /var/peekview/data
-  db_path: /var/peekview/peek.db
+  db_path: /var/peekview/peekview.db
 ```
 
 **优先级**：环境变量 > Config 文件 > 默认值
 
-### 方式 3：命令行参数（一次性覆盖）
-
-```bash
-# 临时指定端口
-peekview serve --port 3000
-
-# 临时指定数据目录
-peekview serve --data-dir /tmp/test-data
-```
-
-## 使用自定义域名
-
-如果使用反向代理（如 Cloudflare Tunnel、Nginx），可通过 `--base-url` 指定外部域名：
-
-```bash
-# 服务端
-peekview serve --base-url https://example.com
-
-# 创建条目时使用自定义域名
-peekview create file.txt -s "My code" --base-url https://example.com
-# 输出: URL: https://example.com/xxxxx
-```
+---
 
 ## 作为系统服务运行
 
-### Linux (systemd)
-
 ```bash
-# 安装为系统服务
-sudo peekview service install --base-url https://example.com
-
-# 或使用用户级服务（无需 sudo）
-peekview service install --user
-
-# 管理命令
-peekview service status   # 查看状态
-peekview service start    # 启动服务
-peekview service stop     # 停止服务
-peekview service uninstall # 卸载服务
+peekview service install --base-url https://example.com  # 安装系统服务
+peekview service install --user                          # 用户级服务（无需 sudo）
+peekview service status                                  # 查看状态
+peekview service start                                   # 启动服务
+peekview service stop                                    # 停止服务
+peekview service uninstall                               # 卸载服务
 ```
-
-### macOS (launchd)
-
-```bash
-# 安装为用户服务
-peekview service install --user
-
-# 管理命令与 Linux 相同
-peekview service status
-```
-
-服务配置：
-- 开机自启动
-- 自动重启（崩溃后 5 秒重启）
-- 日志位置：`/var/log/peekview.log` (系统服务) 或 `~/.peekview/service.log` (用户服务)
 
 ---
 
@@ -327,8 +237,6 @@ peekview service status
 | CLI | Click + Rich |
 | 测试 | pytest + Vitest + Playwright |
 
-**注意：** `frontend/` 目录为旧版本，已弃用。当前使用 `frontend-v3/`。
-
 ---
 
 ## 项目文档
@@ -336,9 +244,8 @@ peekview service status
 - [部署指南](docs/DEPLOYMENT.md) - 完整安装、配置、部署教程
 - [调试指南](docs/DEBUGGING.md) - 本地源码调试指南
 - [项目索引](INDEX.md) - 实现进度与完整文档清单
-- [需求规格](docs/specs/spec-requirements.md) - 用户故事与验收标准
-- [技术设计](docs/specs/spec-design.md) - 架构设计文档
-- [测试计划](docs/specs/spec-test-plan.md) - 详细测试用例
+- [用户认证规格](docs/specs/spec-user-auth.md) - 认证系统设计
+- [远程 CLI 规格](docs/specs/spec-remote-cli.md) - 远程 CLI 设计
 - [开发流程](docs/process/workflow.md) - P0-P4 标准开发流程
 - [发布流程](docs/process/release.md) - 版本发布规范
 - [API 文档](backend/README.md) - 后端详细说明

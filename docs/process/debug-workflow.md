@@ -126,6 +126,12 @@ make debug-test
 - ✅ **分页器页码显示和跳转**
 - ✅ 主题切换
 - ✅ 移动端布局
+- ✅ **用户认证（登录/注册/登出）** (v0.1.25+)
+- ✅ **私有条目对匿名不可见、对 owner 可见** (v0.1.25+)
+- ✅ **Owner 卡片操作（可见性切换/删除）** (v0.1.25+)
+- ✅ **All/Mine 标签页筛选** (v0.1.26+)
+- ✅ **API Key 创建/列表/撤销** (v0.1.26+)
+- ✅ **API Key 认证创建条目** (v0.1.26+)
 
 **测试结果位置**:
 - 截图: `/tmp/e2e-results/*.png`
@@ -228,6 +234,37 @@ grep -o 'assets/[^"]*\.js' backend/peekview/static/index.html
 ls backend/peekview/static/assets/ | grep index
 ```
 
+### Q: E2E 认证测试失败（登录对话框不关闭）
+```bash
+# 症状: login dialog opens and registers 测试失败
+# 原因 1: 调试服务运行旧代码（pipx 版本没有 auth 端点）
+# 检查版本:
+curl -s http://127.0.0.1:8888/health | jq '.version'
+# 如果不是本地开发版本，重新安装: pip install -e ".[test]" --break-system-packages
+
+# 原因 2: dev-server.sh 使用了错误的 Python 版本
+# 检查启动日志中 Python 版本
+grep "Python" /tmp/peekview-debug.log
+
+# 原因 3: 用户名冲突（之前测试残留）
+# 解决: 使用 make debug-stop && make debug-start 清理数据
+```
+
+### Q: E2E 测试连接到了错误的服务
+```bash
+# 症状: page.request 返回 404 或错误数据
+# 原因: Playwright 使用了默认 baseURL (localhost:5173)
+# 修复: 必须通过 make debug-test 运行（自动设置 BASE_URL）
+
+# ❌ 错误: 直接运行 npx playwright test（缺少 BASE_URL）
+npx playwright test e2e/debug-server.spec.ts
+
+# ✅ 正确: 使用 make 或手动设置 BASE_URL
+make debug-test
+# 或
+BASE_URL=http://127.0.0.1:8888 npx playwright test
+```
+
 ### Q: E2E 测试失败但浏览器看起来正常
 ```bash
 # 查看测试截图
@@ -286,3 +323,5 @@ ps aux | grep peekview
 2. **E2E 测试是最后一道防线** - 手动测试容易遗漏边界情况
 3. **调试服务和正式服务并存** - 用不同端口，不互相干扰
 4. **用户确认是发布前提** - 自动化测试通过 ≠ 用户体验 OK
+5. **Python 版本很重要** - dev-server.sh 必须使用安装了 peekview 的 Python 3.12+ (v0.1.25 教训)
+6. **E2E 测试必须设置 BASE_URL** - 否则 Playwright 会连接默认的 Vite 开发服务器 (v0.1.25 教训)
