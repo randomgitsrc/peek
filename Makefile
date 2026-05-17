@@ -1,7 +1,7 @@
 # PeekView 项目根级 Makefile
 # 统一前后端构建和发布
 
-.PHONY: help build build-frontend build-backend build-fast test test-quick test-frontend test-backend publish clean install dev debug debug-build debug-start debug-stop debug-test debug-verify-isolation debug-status verify-local pre-publish pre-publish-quick bump-version check-docs check-env-vars doc-audit setup-hooks
+.PHONY: help build build-frontend build-backend build-fast test test-quick test-frontend test-backend publish clean install dev debug debug-build debug-start debug-stop debug-test debug-verify-isolation debug-status verify-local pre-publish pre-publish-quick bump-version sync-version-docs doc-checklist check-docs check-env-vars doc-audit setup-hooks
 
 # Default target
 help:
@@ -25,12 +25,19 @@ help:
 	@echo "  make debug-status   - Check dev server status"
 	@echo ""
 	@echo "RELEASE:"
-	@echo "  1. make bump-version NEW_VERSION=x.y.z  - Update all version files"
+	@echo "  1. make bump-version NEW_VERSION=x.y.z  - Bump version + auto-sync all docs"
 	@echo "  2. make debug       - Debug and E2E test"
 	@echo "  3. make pre-publish-quick - Quick check (no rebuild)"
 	@echo "  4. make pre-publish - Full check (clean build + test)"
 	@echo "  5. make publish     - Build + upload to PyPI"
 	@echo "  6. git tag + push   - Create and push version tag"
+	@echo ""
+	@echo "DOCUMENTATION:"
+	@echo "  make doc-checklist      - 查看当前变更需要更新哪些文档"
+	@echo "  make sync-version-docs  - 仅同步文档版本号（不 bump）"
+	@echo "  make check-doc-sync     - 全面文档一致性检查"
+	@echo "  make update-docs        - 自动生成 FEATURES.md"
+	@echo "  make setup-hooks        - 安装 pre-commit hook"
 	@echo ""
 	@echo "Full docs: docs/process/debug-workflow.md docs/process/release.md"
 
@@ -167,7 +174,7 @@ verify-wheel:
 bump-version:
 	@if [ -z "$(NEW_VERSION)" ]; then \
 		echo "Usage: make bump-version NEW_VERSION=x.y.z"; \
-		echo "Example: make bump-version NEW_VERSION=0.1.21"; \
+		echo "Example: make bump-version NEW_VERSION=0.1.29"; \
 		exit 1; \
 	fi
 	@echo "→ Bumping version to $(NEW_VERSION)..."
@@ -177,24 +184,38 @@ bump-version:
 	sed -i "s/^version = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/version = \"$(NEW_VERSION)\"/" backend/pyproject.toml
 	@# Update package.json
 	sed -i "s/\"version\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"$(NEW_VERSION)\"/" frontend-v3/package.json
-	@# Verify
-	@echo "→ Verifying version updates..."
+	@# Verify code files
 	@BACKEND_VERSION=$$(cd backend && python3 -c "from peekview import __version__; print(__version__)"); \
 	PYPROJECT_VERSION=$$(grep "^version = " backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
 	PACKAGE_VERSION=$$(grep '"version":' frontend-v3/package.json | sed 's/.*"version": "\(.*\)".*/\1/'); \
-	echo "  backend/__init__.py: $$BACKEND_VERSION"; \
-	echo "  pyproject.toml: $$PYPROJECT_VERSION"; \
-	echo "  package.json: $$PACKAGE_VERSION"; \
 	if [ "$$BACKEND_VERSION" = "$(NEW_VERSION)" ] && [ "$$PYPROJECT_VERSION" = "$(NEW_VERSION)" ] && [ "$$PACKAGE_VERSION" = "$(NEW_VERSION)" ]; then \
-		echo "✓ All version files updated to $(NEW_VERSION)"; \
+		echo "✓ 代码版本文件已更新: v$(NEW_VERSION)"; \
 	else \
-		echo "✗ Version mismatch detected"; \
-		exit 1; \
+		echo "✗ 版本不一致，请检查"; exit 1; \
 	fi
+	@# Auto-sync all documentation
+	@echo "→ 自动同步文档版本引用..."
+	@python3 scripts/doc-sync/update_version_docs.py
 	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Update CHANGELOG.md with new version"
-	@echo "  2. Update INDEX.md version reference"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "✅ bump-version 完成: v$(NEW_VERSION)"
+	@echo ""
+	@echo "还需手动完成："
+	@echo "  1. 编辑 CHANGELOG.md，填写 [$(NEW_VERSION)] 具体变更内容"
+	@echo "  2. git add -A && git commit -m \"chore(release): bump to v$(NEW_VERSION)\""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# 单独同步文档版本（不 bump，用于修复漏掉的文档同步）
+sync-version-docs:
+	@echo "→ 同步文档版本引用..."
+	@python3 scripts/doc-sync/update_version_docs.py
+	@echo ""
+	@echo "提示：如需将更改加入暂存区："
+	@echo "  git add README.md CLAUDE.md INDEX.md CHANGELOG.md docs/process/active-tasks.md backend/README.md"
+
+# 查看当前变更需要更新哪些文档
+doc-checklist:
+	@python3 scripts/doc-sync/doc_checklist.py
 	@echo "  3. make verify-local  - Quick verification"
 	@echo "  4. git add -A && git commit -m \"chore(release): bump version to $(NEW_VERSION)\""
 

@@ -4,7 +4,7 @@
 
 Agent（AI）产出 → PeekView 格式化 → 人类友好查看
 
-[![Version](https://img.shields.io/badge/version-0.1.26-blue.svg)](https://github.com/randomgitsrc/peekview/releases)
+[![Version](https://img.shields.io/badge/version-0.1.28-blue.svg)](https://github.com/randomgitsrc/peekview/releases)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3.4+-green.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

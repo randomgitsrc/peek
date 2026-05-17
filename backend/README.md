@@ -127,7 +127,7 @@ remote:
 ### Health Check
 
 ```
-GET /health → { "status": "ok", "version": "0.1.26" }
+GET /health → { "status": "ok", "version": "0.1.28" }
 ```
 
 ### Entry API

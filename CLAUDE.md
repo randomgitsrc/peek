@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **PeekView** is a lightweight code and document formatting service. Core purpose: Agent (AI) creates entries via API/CLI → humans view formatted content in browser.
 
 - **Current State:** Backend and frontend both complete (Tasks 0-16), Auth + API Key features added
-- **Current Version:** v0.1.26
+- **Current Version:** v0.1.28
 - **Architecture:** FastAPI (Python 3.12+) + SQLite (WAL mode, FTS5) backend, Vue 3 + Vite + TypeScript + Shiki SPA frontend
 - **Key Docs:** Auth spec in `docs/specs/spec-user-auth.md`, remote CLI spec in `docs/specs/spec-remote-cli.md`
 - **Dev Process:** Standard workflow in `docs/process/workflow.md` - **READ THIS FIRST** before starting any work

@@ -7,6 +7,20 @@
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-05-17
+
+### 修复
+
+- **前端兼容性**：`isPublic` 字段缺失时默认为 `true`（升级自 v0.1.24 时所有条目被错误标为私有）
+  - `api/client.ts`：`is_public ?? true` 替代 `!is_public`
+
+## [0.1.27] - 2026-05-17
+
+### 修复
+
+- **依赖缺失**：`requests` 库未在 `pyproject.toml` 中声明，导致 `pipx install` 后 Remote CLI 报 `ModuleNotFoundError`
+
+
 ## [0.1.26] - 2026-05-17
 
 ### 新增
