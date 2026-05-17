@@ -8,8 +8,8 @@
 |---------|------|---------|
 | `checkpoints/` | P0-T19 等任务检查点文件 | 任务已完成 |
 | `mermaid-feature/` | Mermaid 功能开发过程文档 | 功能已上线（v0.1.x）|
-| `plans/` | 历史实现计划 | 功能已实现或计划取消 |
-| `specs/` | 历史设计规格文档 | 功能已实现 |
+| `plans/` | 已完成的实现计划（MVP + Auth + Remote CLI + API Keys）| 功能已实现 |
+| `specs/` | MVP 阶段规格文档（需求、设计、测试计划、评审）| 功能已实现 |
 | `reviews/` | 历史设计评审 | 已纳入实现 |
 | `design/` | 早期 UI 设计规格 | 已实现 |
 | `superpowers/` | 早期前端 v3 设计文档 | 已实现 |
