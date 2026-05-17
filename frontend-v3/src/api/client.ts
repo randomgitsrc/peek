@@ -1,8 +1,9 @@
 import axios, { type AxiosInstance } from 'axios'
-import type { Entry, EntryListResponse, ListEntriesParams } from '@/types'
-import type { EntryResponse, EntryListItemResponse, EntryListApiResponse } from './types'
+import type { Entry, EntryListResponse, ListEntriesParams, AuthResponse, User, ApiKey, ApiKeyCreateResult } from '@/types'
+import type { EntryResponse, EntryListItemResponse, EntryListApiResponse, AuthApiResponse, UserApiResponse, ApiKeyResponse, ApiKeyCreateResponse, ApiKeyListApiResponse } from './types'
 
 const API_BASE = '/api/v1'
+const TOKEN_KEY = 'peekview_token'
 
 class PeekAPI {
   private client: AxiosInstance
@@ -14,9 +15,34 @@ class PeekAPI {
         'Content-Type': 'application/json',
       },
     })
+
+    // Request interceptor: inject JWT token
+    this.client.interceptors.request.use((config) => {
+      const token = localStorage.getItem(TOKEN_KEY)
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      return config
+    })
+
+    // Response interceptor: handle 401 (session expired)
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          const token = localStorage.getItem(TOKEN_KEY)
+          if (token) {
+            // Mid-session 401: clear token and notify
+            localStorage.removeItem(TOKEN_KEY)
+            // Dispatch a custom event for the auth store to handle
+            window.dispatchEvent(new CustomEvent('peekview:auth-expired'))
+          }
+        }
+        return Promise.reject(error)
+      }
+    )
   }
 
-  // Transform API response to domain model
   private transformFile(file: import('./types').FileResponse) {
     return {
       id: file.id,
@@ -29,7 +55,6 @@ class PeekAPI {
     }
   }
 
-  // Transform for list items (simplified, no files array)
   private transformListItem(entry: EntryListItemResponse): Entry {
     return {
       id: entry.id,
@@ -37,13 +62,15 @@ class PeekAPI {
       summary: entry.summary,
       tags: entry.tags,
       status: entry.status as 'active' | 'expired',
-      files: [], // Empty array for list view
+      files: [],
       fileCount: entry.file_count,
+      isPublic: entry.is_public,
+      ownerId: entry.owner_id,
+      username: entry.username,
       createdAt: entry.created_at,
     }
   }
 
-  // Transform for detail (full with files)
   private transformEntry(entry: EntryResponse): Entry {
     return {
       id: entry.id,
@@ -52,9 +79,25 @@ class PeekAPI {
       tags: entry.tags,
       status: entry.status as 'active' | 'expired',
       files: entry.files.map(f => this.transformFile(f)),
+      isPublic: entry.is_public,
+      ownerId: entry.owner_id,
+      username: entry.username,
       createdAt: entry.created_at,
     }
   }
+
+  private transformUser(user: UserApiResponse): User {
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      isActive: user.is_active,
+      isAdmin: user.is_admin,
+      createdAt: user.created_at,
+    }
+  }
+
+  // --- Entry API --- //
 
   async listEntries(params?: ListEntriesParams): Promise<EntryListResponse> {
     const response = await this.client.get<EntryListApiResponse>('/entries', {
@@ -62,6 +105,7 @@ class PeekAPI {
         q: params?.q,
         tags: params?.tags?.join(','),
         status: params?.status,
+        owner: params?.owner,
         page: params?.page,
         per_page: params?.perPage,
       },
@@ -80,6 +124,17 @@ class PeekAPI {
     return this.transformEntry(response.data)
   }
 
+  async toggleEntryVisibility(slug: string, isPublic: boolean): Promise<Entry> {
+    const response = await this.client.patch<EntryResponse>(`/entries/${slug}`, {
+      is_public: isPublic,
+    })
+    return this.transformEntry(response.data)
+  }
+
+  async deleteEntry(slug: string): Promise<void> {
+    await this.client.delete(`/entries/${slug}`)
+  }
+
   async getFileContent(slug: string, fileId: number): Promise<string> {
     const response = await this.client.get<string>(
       `/entries/${slug}/files/${fileId}/content`,
@@ -92,8 +147,91 @@ class PeekAPI {
     return `${API_BASE}/entries/${slug}/files/${fileId}`
   }
 
-  downloadPack(slug: string): string {
-    return `${API_BASE}/entries/${slug}/files/pack`
+  // --- Auth API --- //
+
+  async login(username: string, password: string): Promise<AuthResponse> {
+    const response = await this.client.post<AuthApiResponse>('/auth/login', {
+      username,
+      password,
+    })
+    const data = response.data
+    localStorage.setItem(TOKEN_KEY, data.access_token)
+    return {
+      accessToken: data.access_token,
+      tokenType: data.token_type,
+      user: this.transformUser(data.user),
+    }
+  }
+
+  async register(username: string, password: string, displayName?: string): Promise<AuthResponse> {
+    const response = await this.client.post<AuthApiResponse>('/auth/register', {
+      username,
+      password,
+      display_name: displayName || null,
+    })
+    const data = response.data
+    localStorage.setItem(TOKEN_KEY, data.access_token)
+    return {
+      accessToken: data.access_token,
+      tokenType: data.token_type,
+      user: this.transformUser(data.user),
+    }
+  }
+
+  async getMe(): Promise<User> {
+    const response = await this.client.get<UserApiResponse>('/auth/me')
+    return this.transformUser(response.data)
+  }
+
+  logout(): void {
+    localStorage.removeItem(TOKEN_KEY)
+    // POST to /auth/logout (204, no body needed)
+    this.client.post('/auth/logout').catch(() => {
+      // Ignore errors on logout — server doesn't require it
+    })
+  }
+
+  // --- API Key management --- //
+
+  private transformApiKey(key: ApiKeyResponse): ApiKey {
+    return {
+      id: key.id,
+      name: key.name,
+      keyPrefix: key.key_prefix,
+      expiresAt: key.expires_at,
+      lastUsedAt: key.last_used_at,
+      createdAt: key.created_at,
+    }
+  }
+
+  async listApiKeys(): Promise<ApiKey[]> {
+    const response = await this.client.get<ApiKeyListApiResponse>('/apikeys')
+    return response.data.items.map(k => this.transformApiKey(k))
+  }
+
+  async createApiKey(name: string, expiresIn?: string): Promise<ApiKeyCreateResult> {
+    const payload: { name: string; expires_in?: string } = { name }
+    if (expiresIn) payload.expires_in = expiresIn
+
+    const response = await this.client.post<ApiKeyCreateResponse>('/apikeys', payload)
+    const data = response.data
+    return {
+      id: data.id,
+      name: data.name,
+      key: data.key,
+      keyPrefix: data.key_prefix,
+      expiresAt: data.expires_at,
+      createdAt: data.created_at,
+    }
+  }
+
+  async revokeApiKey(keyId: number): Promise<void> {
+    await this.client.delete(`/apikeys/${keyId}`)
+  }
+
+  async cleanupExpiredKeys(): Promise<number> {
+    const response = await this.client.delete<{ deleted: number }>('/apikeys/expired')
+    return response.data.deleted
   }
 }
 

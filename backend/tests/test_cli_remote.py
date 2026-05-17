@@ -425,7 +425,15 @@ class TestCLIRemoteConfig:
     def test_config_set_remote_url(self, tmp_path):
         """Test setting remote URL via config."""
         # Use temp config file by setting HOME to temp directory
-        with patch.dict(subprocess.os.environ, {"HOME": str(tmp_path)}):
+        # Must also set PYTHONPATH to include user site-packages so
+        # dependencies like sqlalchemy remain importable when HOME changes.
+        import site
+        user_site = site.getusersitepackages()
+        env_overrides = {
+            "HOME": str(tmp_path),
+            "PYTHONPATH": user_site,
+        }
+        with patch.dict(subprocess.os.environ, env_overrides):
             result = subprocess.run(
                 [
                     sys.executable, "-m", "peekview",

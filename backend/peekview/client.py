@@ -36,6 +36,7 @@ class PeekClient:
         self,
         base_url: str,
         api_key: str = "",
+        token: str = "",
         timeout: int = 30,
         verify_ssl: bool = True
     ):
@@ -43,7 +44,12 @@ class PeekClient:
         self.timeout = timeout
         self.verify = verify_ssl
         self.headers: dict[str, str] = {}
-        if api_key:
+        # JWT token takes priority over API Key
+        if token:
+            self.headers["Authorization"] = f"Bearer {token}"
+        elif api_key:
+            self.headers["X-API-Key"] = api_key
+            # Backward compat: also send as Bearer for older servers
             self.headers["Authorization"] = f"Bearer {api_key}"
 
     def _parse_entry(self, data: dict[str, Any]) -> RemoteEntry:
@@ -126,12 +132,14 @@ class PeekClient:
         files_data: list[dict[str, Any]] | None = None,
         dirs_data: list[dict[str, str]] | None = None,
         expires_in: str | None = None,
+        is_public: bool = True,
     ) -> RemoteEntry:
         """POST /api/v1/entries — Create a new entry."""
         payload: dict[str, Any] = {
             "summary": summary,
             "slug": slug,
             "tags": tags or [],
+            "is_public": is_public,
             "files": files_data or [],
             "dirs": dirs_data or [],
             "expires_in": expires_in,
@@ -213,3 +221,80 @@ class PeekClient:
             self._handle_error(resp)
 
         return {"ok": True}
+
+    def login(self, username: str, password: str) -> dict[str, Any]:
+        """POST /api/v1/auth/login — Login and get JWT token."""
+        resp = requests.post(
+            f"{self.base_url}/api/v1/auth/login",
+            json={"username": username, "password": password},
+            timeout=self.timeout,
+            verify=self.verify,
+        )
+
+        if resp.status_code != 200:
+            self._handle_error(resp)
+
+        return resp.json()
+
+    # --- API Key management (remote only) ---
+
+    def create_api_key(self, name: str, expires_in: str | None = None) -> dict[str, Any]:
+        """POST /api/v1/apikeys — Create a new API key."""
+        payload: dict[str, Any] = {"name": name}
+        if expires_in:
+            payload["expires_in"] = expires_in
+
+        resp = requests.post(
+            f"{self.base_url}/api/v1/apikeys",
+            json=payload,
+            headers=self.headers,
+            timeout=self.timeout,
+            verify=self.verify,
+        )
+
+        if resp.status_code != 201:
+            self._handle_error(resp)
+
+        return resp.json()
+
+    def list_api_keys(self) -> dict[str, Any]:
+        """GET /api/v1/apikeys — List API keys."""
+        resp = requests.get(
+            f"{self.base_url}/api/v1/apikeys",
+            headers=self.headers,
+            timeout=self.timeout,
+            verify=self.verify,
+        )
+
+        if resp.status_code != 200:
+            self._handle_error(resp)
+
+        return resp.json()
+
+    def revoke_api_key(self, key_id: int) -> dict[str, Any]:
+        """DELETE /api/v1/apikeys/{key_id} — Revoke an API key."""
+        resp = requests.delete(
+            f"{self.base_url}/api/v1/apikeys/{key_id}",
+            headers=self.headers,
+            timeout=self.timeout,
+            verify=self.verify,
+        )
+
+        if resp.status_code != 200:
+            self._handle_error(resp)
+
+        return resp.json()
+
+    def cleanup_expired_keys(self) -> dict[str, Any]:
+        """DELETE /api/v1/apikeys/expired — Cleanup expired API keys."""
+        resp = requests.delete(
+            f"{self.base_url}/api/v1/apikeys/expired",
+            headers=self.headers,
+            timeout=self.timeout,
+            verify=self.verify,
+        )
+
+        if resp.status_code != 200:
+            self._handle_error(resp)
+
+        return resp.json()

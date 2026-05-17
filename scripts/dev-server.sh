@@ -65,13 +65,30 @@ start_server() {
     echo "  数据库: $DB_PATH"
     echo "  数据目录: $DATA_DIR/data"
     echo "  自动过期: 3600秒 (1小时)"
+    # Detect Python with peekview installed (need 3.12+)
+    PYTHON=""
+    for cmd in python3.12 python3.13 python3; do
+        if command -v "$cmd" &>/dev/null; then
+            if "$cmd" -c "import peekview" 2>/dev/null; then
+                PYTHON="$cmd"
+                break
+            fi
+        fi
+    done
+    if [ -z "$PYTHON" ]; then
+        echo "✗ 错误: 找不到安装了 peekview 的 Python 3.12+"
+        echo "   请运行: cd backend && pip install -e '.[test]'"
+        exit 1
+    fi
+    echo "✓ Python: $($PYTHON --version)"
+
     cd backend
     PEEKVIEW_STORAGE__DATA_DIR="$DATA_DIR/data" \
     PEEKVIEW_STORAGE__DB_PATH="$DB_PATH" \
     PEEKVIEW_PORT=$PORT \
     PEEKVIEW_CLEANUP__INTERVAL_SECONDS=600 \
     PEEKVIEW_DEBUG_MODE=1 \
-        python3 -m uvicorn peekview.main:get_app \
+        $PYTHON -m uvicorn peekview.main:get_app \
         --host 127.0.0.1 \
         --port $PORT \
         --factory \

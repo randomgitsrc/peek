@@ -9,7 +9,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import func, text
+from sqlalchemy import String, func, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
@@ -30,6 +30,7 @@ from peekview.models import (
     EntryResponse,
     File,
     FileResponse,
+    User,
 )
 from peekview.services.file_service import (
     decode_base64_content,
@@ -87,6 +88,8 @@ class EntryService:
         files_data: list[dict[str, Any]] | None = None,
         dirs_data: list[dict[str, str]] | None = None,
         expires_in: str | None = None,
+        is_public: bool = True,
+        current_user_id: int | None = None,
     ) -> CreateEntryResponse:
         """Create a new entry with files.
 
@@ -140,11 +143,17 @@ class EntryService:
         # Validate limits
         self._validate_limits(files_info)
 
+        # Visibility: anonymous users cannot create private entries (service-layer enforcement)
+        if current_user_id is None:
+            is_public = True
+
         # Create entry in DB + write files (transaction with rollback)
         entry = Entry(
             slug=slug,
             summary=summary.strip(),
             tags=tags or [],
+            is_public=is_public,
+            owner_id=current_user_id,
             expires_at=expires_at,
         )
 
@@ -155,6 +164,8 @@ class EntryService:
                 session.refresh(entry)
                 entry_id = entry.id
                 entry_slug = entry.slug
+                entry_is_public = entry.is_public
+                entry_owner_id = entry.owner_id
                 entry_created_at = entry.created_at
 
                 # Write files to disk + create File records
@@ -229,19 +240,25 @@ class EntryService:
         except IntegrityError:
             # Slug conflict — TOCTOU protection: retry with suffix
             return self._retry_with_slug_suffix(
-                summary, slug, tags, files_data, dirs_data, expires_in
+                summary, slug, tags, files_data, dirs_data, expires_in, is_public, current_user_id
             )
 
         return CreateEntryResponse(
             id=entry_id,
             slug=entry_slug,
             url=self.config.build_view_url(entry_slug),
+            is_public=entry_is_public,
+            owner_id=entry_owner_id,
             created_at=entry_created_at,
             files=file_responses,
         )
 
-    def get_entry(self, slug: str) -> EntryResponse:
-        """Get entry details by slug."""
+    def get_entry(self, slug: str, current_user_id: int | None = None, is_admin: bool = False) -> EntryResponse:
+        """Get entry details by slug.
+
+        Private entries are only visible to their owner (or admin).
+        Returns 404 for non-owners of private entries (not 403, to prevent slug enumeration).
+        """
         with Session(self.engine) as session:
             entry = session.exec(
                 select(Entry).where(Entry.slug == slug)
@@ -249,11 +266,18 @@ class EntryService:
             if not entry:
                 raise NotFoundError(f"Entry not found: {slug}")
 
+            # Visibility check: private entries only visible to owner or admin
+            if not entry.is_public and not is_admin and entry.owner_id != current_user_id:
+                raise NotFoundError(f"Entry not found: {slug}")
+
             files = session.exec(
                 select(File).where(File.entry_id == entry.id)
             ).all()
 
-            return self._build_response(entry, list(files))
+            # Resolve username for owner
+            username = self._resolve_username(session, entry.owner_id)
+
+            return self._build_response(entry, list(files), username)
 
     def list_entries(
         self,
@@ -262,8 +286,17 @@ class EntryService:
         status: str | None = None,
         page: int = 1,
         per_page: int = 20,
+        current_user_id: int | None = None,
+        is_admin: bool = False,
+        owner: str | None = None,
     ) -> EntryListResponse:
-        """List entries with search, filter, and pagination."""
+        """List entries with search, filter, pagination, and visibility.
+
+        Anonymous users see only public entries.
+        Logged-in users see public entries + their own private entries.
+        Admin users see all entries.
+        owner="me" filters to only entries owned by current_user_id.
+        """
         per_page = min(per_page, self.config.limits.max_per_page)
         page = max(page, 1)
         offset = (page - 1) * per_page
@@ -280,6 +313,35 @@ class EntryService:
             else:
                 query = query.where(Entry.status != "archived")
                 count_query = count_query.where(Entry.status != "archived")
+
+            # Visibility filter
+            if owner == "me":
+                if current_user_id is None:
+                    return EntryListResponse(items=[], total=0, page=page, per_page=per_page)
+                query = query.where(Entry.owner_id == current_user_id)
+                count_query = count_query.where(Entry.owner_id == current_user_id)
+            elif is_admin:
+                # Admin sees all entries
+                pass
+            elif current_user_id is None:
+                # Anonymous: only public entries
+                query = query.where(Entry.is_public == True)
+                count_query = count_query.where(Entry.is_public == True)
+            else:
+                # Logged in: public + own entries (both public and private)
+                query = query.where(
+                    (Entry.is_public == True) | (Entry.owner_id == current_user_id)
+                )
+                count_query = count_query.where(
+                    (Entry.is_public == True) | (Entry.owner_id == current_user_id)
+                )
+
+            # Tags filter (JSON array — use LIKE for SQLite JSON compatibility)
+            if tags:
+                for tag in tags:
+                    quoted = f'"{tag}"'
+                    query = query.where(Entry.tags.cast(String).like(f"%{quoted}%"))
+                    count_query = count_query.where(Entry.tags.cast(String).like(f"%{quoted}%"))
 
             # FTS5 search
             if q and q.strip():
@@ -306,12 +368,22 @@ class EntryService:
             total = session.exec(count_query).one()
             entries = session.exec(query.offset(offset).limit(per_page)).all()
 
+            # Batch resolve usernames (solve N+1 problem)
+            owner_ids = [e.owner_id for e in entries if e.owner_id is not None]
+            username_map = {}
+            if owner_ids:
+                users = session.exec(
+                    select(User).where(User.id.in_(set(owner_ids)))
+                ).all()
+                username_map = {u.id: u.username for u in users}
+
             items = []
             for e in entries:
                 # Get file count
                 file_count = session.exec(
                     select(func.count()).select_from(File).where(File.entry_id == e.id)
                 ).one()
+                username = username_map.get(e.owner_id) if e.owner_id else None
                 items.append(
                     EntryListItem(
                         id=e.id,
@@ -320,6 +392,9 @@ class EntryService:
                         tags=e.tags,
                         status=e.status,
                         file_count=file_count,
+                        is_public=e.is_public,
+                        owner_id=e.owner_id,
+                        username=username,
                         created_at=e.created_at,
                         updated_at=e.updated_at,
                     )
@@ -333,13 +408,19 @@ class EntryService:
         summary: str | None = None,
         status: str | None = None,
         tags: list[str] | None = None,
+        is_public: bool | None = None,
         add_files: list[dict[str, Any]] | None = None,
         remove_file_ids: list[int] | None = None,
         add_dirs: list[dict[str, str]] | None = None,
+        current_user_id: int | None = None,
+        is_admin: bool = False,
+        is_api_key_auth: bool = False,
     ) -> EntryResponse:
         """Update an entry.
 
+        Only the owner or admin can update an entry. Non-owners get 404 (not 403).
         When files are removed via remove_file_ids, their disk files are also deleted.
+        Global API key auth bypasses ownership checks.
         """
         with Session(self.engine) as session:
             entry = session.exec(
@@ -347,6 +428,14 @@ class EntryService:
             ).first()
             if not entry:
                 raise NotFoundError(f"Entry not found: {slug}")
+
+            # Global API key bypasses ownership checks
+            if not is_api_key_auth:
+                # Visibility + ownership check
+                if not entry.is_public and not is_admin and entry.owner_id != current_user_id:
+                    raise NotFoundError(f"Entry not found: {slug}")
+                if not is_admin and entry.owner_id != current_user_id:
+                    raise NotFoundError(f"Entry not found: {slug}")
 
             entry_id = entry.id
 
@@ -357,6 +446,8 @@ class EntryService:
                 entry.status = status
             if tags is not None:
                 entry.tags = tags
+            if is_public is not None:
+                entry.is_public = is_public
             entry.updated_at = datetime.now(timezone.utc)
             session.add(entry)
 
@@ -447,8 +538,82 @@ class EntryService:
 
             return self._build_response(entry, list(files))
 
-    def delete_entry(self, slug: str) -> None:
-        """Delete entry and all associated files."""
+    def delete_entry(self, slug: str, current_user_id: int | None = None, is_api_key_auth: bool = False, allow_local: bool = False, is_admin: bool = False) -> None:
+        """Delete entry and all associated files.
+
+        Only the owner or admin can delete an entry. Admin can also delete
+        owner_id=NULL entries. Anonymous users cannot delete any entries.
+
+        Args:
+            slug: Entry slug.
+            current_user_id: JWT user ID (None for anonymous/API Key).
+            is_api_key_auth: True if authenticated via API Key (service-level).
+            allow_local: True for local/CLI mode (no auth, backward compat).
+            is_admin: True if user has admin role.
+        """
+        # Local mode: bypass all auth checks (CLI operates directly on DB)
+        if allow_local:
+            return self.delete_entry_by_api_key(slug)
+
+        # API Key auth bypasses owner checks
+        if is_api_key_auth:
+            return self.delete_entry_by_api_key(slug)
+
+        # No auth at all — cannot delete
+        if current_user_id is None:
+            raise NotFoundError(f"Entry not found: {slug}")
+
+        with Session(self.engine) as session:
+            entry = session.exec(
+                select(Entry).where(Entry.slug == slug)
+            ).first()
+            if not entry:
+                raise NotFoundError(f"Entry not found: {slug}")
+
+            # Visibility check for private entries
+            if not entry.is_public and not is_admin and entry.owner_id != current_user_id:
+                raise NotFoundError(f"Entry not found: {slug}")
+
+            # Ownership check: only owner or admin can delete
+            # owner_id=NULL entries can be deleted by admin only
+            if entry.owner_id is None and not is_admin:
+                raise NotFoundError(f"Entry not found: {slug}")
+            if entry.owner_id is not None and not is_admin and entry.owner_id != current_user_id:
+                raise NotFoundError(f"Entry not found: {slug}")
+
+            entry_id = entry.id
+            session.delete(entry)
+            session.commit()
+
+        # Delete files (best-effort after DB commit)
+        self.storage.delete_entry_files(entry_id)
+
+    def delete_entry_by_api_key(self, slug: str) -> None:
+        """Delete entry via API Key (service-level auth).
+
+        This bypasses owner checks — API Key holders can delete any entry,
+        including owner_id=NULL legacy entries.
+        """
+        with Session(self.engine) as session:
+            entry = session.exec(
+                select(Entry).where(Entry.slug == slug)
+            ).first()
+            if not entry:
+                raise NotFoundError(f"Entry not found: {slug}")
+
+            entry_id = entry.id
+            session.delete(entry)
+            session.commit()
+
+        # Delete files (best-effort after DB commit)
+        self.storage.delete_entry_files(entry_id)
+
+    def delete_entry_by_api_key(self, slug: str) -> None:
+        """Delete entry via API Key (service-level auth).
+
+        This bypasses owner checks — API Key holders can delete any entry,
+        including owner_id=NULL legacy entries.
+        """
         with Session(self.engine) as session:
             entry = session.exec(
                 select(Entry).where(Entry.slug == slug)
@@ -471,6 +636,8 @@ class EntryService:
         files_data: list[dict[str, Any]] | None,
         dirs_data: list[dict[str, str]] | None,
         expires_in: str | None,
+        is_public: bool = True,
+        current_user_id: int | None = None,
     ) -> CreateEntryResponse:
         """Retry entry creation with slug-N suffix on IntegrityError (TOCTOU protection)."""
         for n in range(2, 100):
@@ -483,6 +650,8 @@ class EntryService:
                     files_data=files_data,
                     dirs_data=dirs_data,
                     expires_in=expires_in,
+                    is_public=is_public,
+                    current_user_id=current_user_id,
                 )
             except IntegrityError:
                 continue
@@ -594,7 +763,14 @@ class EntryService:
                     f"File too large: {f['filename']} ({f['size']} > {self.config.limits.max_file_size})"
                 )
 
-    def _build_response(self, entry: Entry, files: list[File]) -> EntryResponse:
+    def _resolve_username(self, session: Session, owner_id: int | None) -> str | None:
+        """Resolve username for an owner_id. Returns None for anonymous entries."""
+        if owner_id is None:
+            return None
+        user = session.exec(select(User).where(User.id == owner_id)).first()
+        return user.username if user else None
+
+    def _build_response(self, entry: Entry, files: list[File], username: str | None = None) -> EntryResponse:
         """Build EntryResponse from Entry + File records."""
         file_responses = []
         for f in files:
@@ -617,6 +793,9 @@ class EntryService:
             status=entry.status,
             tags=entry.tags,
             files=file_responses,
+            is_public=entry.is_public,
+            owner_id=entry.owner_id,
+            username=username,
             expires_at=entry.expires_at,
             created_at=entry.created_at,
             updated_at=entry.updated_at,

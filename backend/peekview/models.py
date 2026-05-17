@@ -4,15 +4,18 @@ Defines Entry and File models with proper relationships,
 indexes, and FTS5 integration.
 """
 
+import hmac
 import json
+import re
 import secrets
 import string
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, Index, event, text
+from sqlalchemy import Column, ForeignKey, Index, event, text
 from sqlalchemy.dialects.sqlite import JSON
+from pydantic import field_validator
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -68,6 +71,15 @@ def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+API_KEY_PREFIX = "pv_"
+API_KEY_HMAC_KEY = b"peekview-api-key"
+
+
+def hash_api_key(key: str) -> str:
+    """HMAC-SHA256 hash of an API key."""
+    return hmac.new(API_KEY_HMAC_KEY, key.encode(), "sha256").hexdigest()
+
+
 class EntryBase(SQLModel):
     """Base model for Entry."""
 
@@ -78,7 +90,92 @@ class EntryBase(SQLModel):
     )
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     user_id: str = Field(default="default", sa_column_kwargs={"server_default": "default"})
+    is_public: bool = Field(default=True, sa_column_kwargs={"server_default": "1"})
+    owner_id: int | None = Field(
+        default=None,
+        sa_column=Column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True),
+    )
     expires_at: datetime | None = Field(default=None)
+
+
+class UserBase(SQLModel):
+    """Base model for User."""
+
+    username: str = Field(..., min_length=3, max_length=32, unique=True, index=True)
+    password_hash: str = Field(..., max_length=128)
+    display_name: str | None = Field(default=None, max_length=64)
+    is_active: bool = Field(default=True, sa_column_kwargs={"server_default": "1"})
+    is_admin: bool = Field(default=False, sa_column_kwargs={"server_default": "0"})
+
+
+class User(UserBase, table=True):
+    """User model - represents a registered user.
+
+    Attributes:
+        id: Primary key
+        username: Login name (3-32 chars, alphanumeric + underscore + hyphen)
+        password_hash: bcrypt hash (rounds=12)
+        display_name: Optional display name (falls back to username)
+        is_active: Whether the user is enabled (disabled users cannot login)
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+    """
+
+    __tablename__ = "users"
+
+    id: int | None = Field(default=None, primary_key=True)
+    created_at: datetime = Field(
+        default_factory=now_utc,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
+    updated_at: datetime = Field(
+        default_factory=now_utc,
+        sa_column_kwargs={
+            "server_default": text("CURRENT_TIMESTAMP"),
+            "onupdate": text("CURRENT_TIMESTAMP"),
+        },
+    )
+
+    # Relationships
+    entries: list["Entry"] = Relationship(back_populates="owner")
+    api_keys: list["ApiKey"] = Relationship(back_populates="user")
+
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, username={self.username!r})>"
+
+
+class ApiKey(SQLModel, table=True):
+    """API Key model — bound to user, permissions equivalent to JWT."""
+
+    __tablename__ = "api_keys"
+    __table_args__ = (
+        Index("idx_api_keys_user_name", "user_id", "name", unique=True),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(..., foreign_key="users.id", index=True)
+    name: str = Field(..., min_length=1, max_length=64)
+    key_prefix: str = Field(..., max_length=8)
+    key_hash: str = Field(..., max_length=64, unique=True)
+    expires_at: datetime | None = Field(default=None)
+    last_used_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(
+        default_factory=now_utc,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
+    updated_at: datetime = Field(
+        default_factory=now_utc,
+        sa_column_kwargs={
+            "server_default": text("CURRENT_TIMESTAMP"),
+            "onupdate": text("CURRENT_TIMESTAMP"),
+        },
+    )
+
+    # Relationships
+    user: User = Relationship(back_populates="api_keys")
+
+    def __repr__(self) -> str:
+        return f"<ApiKey(id={self.id}, name={self.name!r}, prefix={self.key_prefix!r})>"
 
 
 class Entry(EntryBase, table=True):
@@ -118,6 +215,7 @@ class Entry(EntryBase, table=True):
         back_populates="entry",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    owner: User | None = Relationship(back_populates="entries")
 
     def __repr__(self) -> str:
         return f"<Entry(id={self.id}, slug={self.slug!r})>"
@@ -169,6 +267,8 @@ class File(FileBase, table=True):
 # Additional indexes
 Index("idx_entries_status", Entry.status)
 Index("idx_entries_user_id", Entry.user_id)
+Index("idx_entries_is_public", Entry.is_public)
+Index("idx_entries_is_public_status_created", Entry.is_public, Entry.status, Entry.created_at.desc())
 Index("idx_entries_expires_at", Entry.expires_at)
 Index("idx_entries_created_at", Entry.created_at)
 Index("idx_entries_updated_at", Entry.updated_at)
@@ -229,6 +329,7 @@ class EntryUpdate(SQLModel):
     summary: str | None = Field(default=None, min_length=1, max_length=500)
     status: EntryStatus | None = Field(default=None)
     tags: list[str] | None = Field(default=None)
+    is_public: bool | None = Field(default=None)
     add_files: list[FileCreate] | None = Field(default=None)
     remove_file_ids: list[int] | None = Field(default=None)
     add_dirs: list[DirCreate] | None = Field(default=None)
@@ -273,6 +374,9 @@ class EntryResponse(SQLModel):
     status: str
     tags: list[str]
     files: list[FileResponse]
+    is_public: bool
+    owner_id: int | None
+    username: str | None
     expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -287,6 +391,9 @@ class EntryListItem(SQLModel):
     tags: list[str]
     status: str
     file_count: int
+    is_public: bool
+    owner_id: int | None
+    username: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -306,6 +413,7 @@ class CreateEntryRequest(SQLModel):
     summary: str = Field(..., min_length=1, max_length=500)
     slug: str | None = Field(default=None, max_length=64)
     tags: list[str] = Field(default_factory=list)
+    is_public: bool = Field(default=True)
     expires_in: str | None = Field(default=None)
     files: list[FileCreate] = Field(default_factory=list)
     dirs: list[DirCreate] = Field(default_factory=list)
@@ -317,8 +425,59 @@ class CreateEntryResponse(SQLModel):
     id: int
     slug: str
     url: str
+    is_public: bool
+    owner_id: int | None
     created_at: datetime
     files: list[FileResponse]
+
+
+# Auth schemas
+
+
+RESERVED_USERNAMES = {"default", "system", "admin"}
+
+
+class UserRegister(SQLModel):
+    """Schema for user registration."""
+
+    username: str = Field(..., min_length=3, max_length=32)
+    password: str = Field(..., min_length=8, max_length=72)
+    display_name: str | None = Field(default=None, max_length=64)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if v.lower() in RESERVED_USERNAMES:
+            raise ValueError(f"Username '{v}' is reserved")
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("Username must contain only letters, digits, underscores, and hyphens")
+        return v
+
+
+class UserLogin(SQLModel):
+    """Schema for user login."""
+
+    username: str
+    password: str
+
+
+class UserResponse(SQLModel):
+    """Schema for user in API responses."""
+
+    id: int
+    username: str
+    display_name: str | None
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
+
+
+class AuthResponse(SQLModel):
+    """Schema for auth response (login/register)."""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
 
 
 class ErrorResponse(SQLModel):
@@ -333,3 +492,38 @@ class ErrorDetail(SQLModel):
     code: str
     message: str
     details: dict | None = None
+
+
+# API Key schemas
+
+
+class ApiKeyCreate(SQLModel):
+    """Schema for creating an API key."""
+
+    name: str = Field(..., min_length=1, max_length=64)
+    expires_in: str | None = Field(
+        default=None,
+        description="Duration like '30d', '1h', '6m'",
+    )
+
+
+class ApiKeyResponse(SQLModel):
+    """Schema for API key in list responses (no secret, no hash)."""
+
+    id: int
+    name: str
+    key_prefix: str
+    expires_at: datetime | None
+    last_used_at: datetime | None
+    created_at: datetime
+
+
+class ApiKeyCreateResponse(SQLModel):
+    """Schema for create API key response (includes plaintext key once)."""
+
+    id: int
+    name: str
+    key: str
+    key_prefix: str
+    expires_at: datetime | None
+    created_at: datetime

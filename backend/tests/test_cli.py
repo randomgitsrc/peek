@@ -31,6 +31,9 @@ def isolated_fs(runner, monkeypatch, tmp_path):
     # Set temporary database path for CLI tests
     monkeypatch.setenv("PEEKVIEW_STORAGE__DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("PEEKVIEW_STORAGE__DB_PATH", str(tmp_path / "peekview.db"))
+    # Force local mode (empty string = no remote URL)
+    monkeypatch.setenv("PEEKVIEW_REMOTE__URL", "")
+    monkeypatch.setenv("PEEKVIEW_REMOTE__API_KEY", "")
     with runner.isolated_filesystem() as fs:
         yield fs
 

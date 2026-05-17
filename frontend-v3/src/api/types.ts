@@ -8,6 +8,9 @@ export interface EntryListItemResponse {
   tags: string[]
   status: string
   file_count: number
+  is_public: boolean
+  owner_id: number | null
+  username: string | null
   created_at: string
   updated_at: string
 }
@@ -20,6 +23,10 @@ export interface EntryResponse {
   tags: string[]
   status: string
   files: FileResponse[]
+  is_public: boolean
+  owner_id: number | null
+  username: string | null
+  expires_at: string | null
   created_at: string
   updated_at: string
 }
@@ -39,4 +46,43 @@ export interface EntryListApiResponse {
   total: number
   page: number
   per_page: number
+}
+
+// Auth API response types
+export interface AuthApiResponse {
+  access_token: string
+  token_type: string
+  user: UserApiResponse
+}
+
+export interface UserApiResponse {
+  id: number
+  username: string
+  display_name: string | null
+  is_active: boolean
+  is_admin: boolean
+  created_at: string
+}
+
+// API Key API response types
+export interface ApiKeyResponse {
+  id: number
+  name: string
+  key_prefix: string
+  expires_at: string | null
+  last_used_at: string | null
+  created_at: string
+}
+
+export interface ApiKeyCreateResponse {
+  id: number
+  name: string
+  key: string
+  key_prefix: string
+  expires_at: string | null
+  created_at: string
+}
+
+export interface ApiKeyListApiResponse {
+  items: ApiKeyResponse[]
 }

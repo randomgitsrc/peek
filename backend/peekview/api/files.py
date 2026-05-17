@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
+from peekview.auth import get_current_user
 from peekview.database import get_engine
 from peekview.exceptions import NotFoundError
-from peekview.models import Entry, File
+from peekview.models import Entry, File, User
 from peekview.storage import StorageManager
 
 router = APIRouter(prefix="/api/v1/entries", tags=["files"])
@@ -55,15 +56,25 @@ def _language_to_content_type(language: str | None) -> str:
 
 
 @router.get("/{slug}/files/{file_id}")
-async def download_file(slug: str, file_id: int, request: Request):
+async def download_file(
+    slug: str,
+    file_id: int,
+    request: Request,
+    current_user: User | None = Depends(get_current_user),
+):
     """Download a single file (with Content-Disposition: attachment)."""
     config = request.app.state.config
     engine = get_engine(config)
     storage = StorageManager(config=config)
+    current_user_id = current_user.id if current_user else None
 
     with Session(engine) as session:
         entry = session.exec(select(Entry).where(Entry.slug == slug)).first()
         if not entry:
+            raise NotFoundError(f"Entry not found: {slug}")
+
+        # Visibility check: private entries only visible to owner
+        if not entry.is_public and entry.owner_id != current_user_id:
             raise NotFoundError(f"Entry not found: {slug}")
 
         file_record = session.exec(
@@ -82,7 +93,12 @@ async def download_file(slug: str, file_id: int, request: Request):
 
 
 @router.get("/{slug}/files/{file_id}/content")
-async def get_file_content(slug: str, file_id: int, request: Request):
+async def get_file_content(
+    slug: str,
+    file_id: int,
+    request: Request,
+    current_user: User | None = Depends(get_current_user),
+):
     """Get file content inline (raw text, no Content-Disposition).
 
     Returns the file content with an appropriate Content-Type based on
@@ -91,10 +107,15 @@ async def get_file_content(slug: str, file_id: int, request: Request):
     config = request.app.state.config
     engine = get_engine(config)
     storage = StorageManager(config=config)
+    current_user_id = current_user.id if current_user else None
 
     with Session(engine) as session:
         entry = session.exec(select(Entry).where(Entry.slug == slug)).first()
         if not entry:
+            raise NotFoundError(f"Entry not found: {slug}")
+
+        # Visibility check: private entries only visible to owner
+        if not entry.is_public and entry.owner_id != current_user_id:
             raise NotFoundError(f"Entry not found: {slug}")
 
         file_record = session.exec(

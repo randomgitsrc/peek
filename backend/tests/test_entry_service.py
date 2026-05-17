@@ -176,13 +176,13 @@ class TestUpdateEntry:
 class TestDeleteEntry:
     def test_delete_success(self, entry_service):
         entry_service.create_entry(summary="Delete me", slug="del")
-        entry_service.delete_entry("del")
+        entry_service.delete_entry("del", allow_local=True)
         with pytest.raises(NotFoundError):
             entry_service.get_entry("del")
 
     def test_delete_not_found(self, entry_service):
         with pytest.raises(NotFoundError):
-            entry_service.delete_entry("nonexistent")
+            entry_service.delete_entry("nonexistent", allow_local=True)
 
 
 class TestGetEntryService:

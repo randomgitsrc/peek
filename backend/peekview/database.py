@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Engine, event, text
 from sqlmodel import Session, SQLModel, create_engine
 
-from peekview.models import Entry, File
+from peekview.models import ApiKey, Entry, File, User
 
 if TYPE_CHECKING:
     from peekview.config import PeekConfig
@@ -30,6 +30,71 @@ DEFAULT_PRAGMAS = {
     "temp_store": "MEMORY",  # Store temp tables in memory
     "mmap_size": 268435456,  # 256MB memory-mapped I/O
 }
+
+
+def _run_migrations(engine: Engine) -> None:
+    """Run database migrations for schema evolution.
+
+    Adds new columns to existing tables without breaking existing data.
+    Must be called AFTER SQLModel.metadata.create_all() so that
+    referenced tables (e.g., users) already exist.
+    """
+    with engine.connect() as conn:
+        # Check existing columns in entries table
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(entries)"))}
+
+        if "is_public" not in columns:
+            conn.execute(text("ALTER TABLE entries ADD COLUMN is_public BOOLEAN DEFAULT 1"))
+            logger.info("Migration: added is_public column to entries")
+
+        if "owner_id" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE entries ADD COLUMN owner_id INTEGER "
+                    "REFERENCES users(id) ON DELETE CASCADE"
+                )
+            )
+            logger.info("Migration: added owner_id column to entries")
+
+        # Check existing columns in users table
+        user_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
+
+        if "is_admin" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+            logger.info("Migration: added is_admin column to users")
+
+            # Bootstrap: if no admin exists, make the first user admin
+            admin_count = conn.execute(
+                text("SELECT COUNT(*) FROM users WHERE is_admin = 1")
+            ).scalar()
+            if admin_count == 0:
+                conn.execute(
+                    text("UPDATE users SET is_admin = 1 WHERE id = (SELECT MIN(id) FROM users)")
+                )
+                logger.info("Migration: promoted first user to admin")
+
+        # Check existing indexes
+        indexes = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='index'")
+            )
+        }
+
+        if "idx_entries_is_public" not in indexes:
+            conn.execute(text("CREATE INDEX idx_entries_is_public ON entries(is_public)"))
+            logger.info("Migration: added idx_entries_is_public index")
+
+        if "idx_entries_is_public_status_created" not in indexes:
+            conn.execute(
+                text(
+                    "CREATE INDEX idx_entries_is_public_status_created "
+                    "ON entries(is_public, status, created_at DESC)"
+                )
+            )
+            logger.info("Migration: added idx_entries_is_public_status_created index")
+
+        conn.commit()
 
 
 def init_db(db_path: Path | str) -> Engine:
@@ -67,6 +132,9 @@ def init_db(db_path: Path | str) -> Engine:
 
     # Create tables
     SQLModel.metadata.create_all(engine)
+
+    # Run migrations (must be after create_all so users table exists)
+    _run_migrations(engine)
 
     # Setup FTS5
     setup_fts5(engine)

@@ -12,6 +12,7 @@ Provides command-line interface for:
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import urllib.request
@@ -20,6 +21,7 @@ from typing import Any
 
 import click
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from peekview import __version__
@@ -27,7 +29,7 @@ from peekview.client import PeekClient
 from peekview.config import PeekConfig
 from peekview.database import init_db
 from peekview.main import create_app
-from peekview.models import CreateEntryRequest, EntryCreate
+from peekview.models import CreateEntryRequest, EntryCreate, User
 from peekview.services.entry_service import EntryService
 from peekview.services.file_service import scan_directory
 from peekview.storage import StorageManager
@@ -50,15 +52,19 @@ def _get_backend(
     # Priority 1: CLI argument
     if cli_remote_url is not None:
         remote_url = cli_remote_url
+    # Priority 2: Environment variable (empty string = explicit local mode)
+    elif "PEEKVIEW_REMOTE__URL" in os.environ:
+        remote_url = os.environ["PEEKVIEW_REMOTE__URL"]
+    # Priority 3: Config file
     else:
-        # Priority 2 & 3: env var or config
-        remote_url = os.environ.get("PEEKVIEW_REMOTE__URL") or config.remote.url
+        remote_url = config.remote.url
 
     # Empty string = explicit disable
     if remote_url:
         return PeekClient(
             base_url=remote_url,
             api_key=config.remote.api_key,
+            token=config.remote.token,
             timeout=config.remote.timeout,
             verify_ssl=config.remote.verify_ssl,
         )
@@ -170,6 +176,7 @@ def serve(ctx: click.Context, host: str | None, port: int | None, base_url: str 
 @click.option("--from-stdin", is_flag=True, help="Read file content from stdin")
 @click.option("--base-url", "-b", default=None, help="External base URL for generated links (e.g., https://example.com)")
 @click.option("--remote-url", "-r", default=None, help="Remote server URL (e.g., https://example.com)")
+@click.option("--visibility", "-v", type=click.Choice(["public", "private"]), default="public", help="Entry visibility (public or private)")
 @click.option("--json-output", "-j", is_flag=True, help="Output as JSON")
 def create(
     paths: tuple[str, ...],
@@ -180,6 +187,7 @@ def create(
     from_stdin: bool,
     base_url: str | None,
     remote_url: str | None,
+    visibility: str,
     json_output: bool,
 ) -> None:
     """Create a new entry.
@@ -199,7 +207,7 @@ def create(
 
     # Show remote mode indicator (only in non-JSON mode)
     if is_remote and not json_output:
-        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
+        click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
 
     # Set base_url from CLI if provided (for local mode URL generation)
     if base_url and not is_remote:
@@ -255,6 +263,8 @@ def create(
         # No paths provided - create empty entry
         pass
 
+    is_public = visibility == "public"
+
     try:
         result = backend.create_entry(
             summary=summary,
@@ -263,6 +273,7 @@ def create(
             files_data=files_data if files_data else None,
             dirs_data=dirs_data if dirs_data else None,
             expires_in=expires_in,
+            is_public=is_public,
         )
 
         if json_output:
@@ -306,7 +317,7 @@ def get(slug: str, remote_url: str | None, json_output: bool) -> None:
 
     # Show remote mode indicator (only in non-JSON mode)
     if is_remote and not json_output:
-        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
+        click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
 
     try:
         entry = backend.get_entry(slug)
@@ -381,7 +392,7 @@ def list_entries(
 
     # Show remote mode indicator (only in non-JSON mode)
     if is_remote and not json_output:
-        click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
+        click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
 
     try:
         tag_list = list(tag) if tag else None
@@ -470,7 +481,11 @@ def delete(slug: str, remote_url: str | None) -> None:
         click.echo(f"→ Remote mode: {config.remote.url or remote_url}")
 
     try:
-        backend.delete_entry(slug)
+        if is_remote:
+            backend.delete_entry(slug)
+        else:
+            # Local mode: CLI operates as admin, bypass auth checks
+            backend.delete_entry(slug, current_user_id=None, is_api_key_auth=True, allow_local=True)
         click.echo(f"✓ Deleted entry: {slug}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -962,6 +977,311 @@ def stop_service(user_mode: bool) -> None:
             sys.exit(1)
     else:
         click.echo(f"Service stop not supported on {system}", err=True)
+        sys.exit(1)
+
+
+@cli.group(name="user")
+def user_cmd():
+    """Manage PeekView users.
+
+    Examples:
+        peekview user create alice       # Create user (interactive password)
+        peekview user create bob -p pass # Create user with password
+        peekview user list               # List users
+    """
+    pass
+
+
+@user_cmd.command(name="create")
+@click.argument("username")
+@click.option("--password", "-p", default=None, help="User password (interactive if not provided)")
+@click.option("--admin", is_flag=True, default=False, help="Create as admin user")
+def user_create(username: str, password: str | None, admin: bool) -> None:
+    """Create a new user (local database only).
+
+    First user is always allowed. Creates user directly in local database.
+    """
+    from peekview.auth import hash_password
+    from peekview.models import RESERVED_USERNAMES
+
+    # Validate username
+    if username.lower() in RESERVED_USERNAMES:
+        click.echo(f"Error: Username '{username}' is reserved", err=True)
+        sys.exit(1)
+    if len(username) < 3 or len(username) > 32:
+        click.echo(f"Error: Username must be 3-32 characters", err=True)
+        sys.exit(1)
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        click.echo(f"Error: Username must contain only letters, digits, underscores, and hyphens", err=True)
+        sys.exit(1)
+
+    # Get password
+    if password is None:
+        password = click.prompt("Password", hide_input=True)
+        confirm = click.prompt("Confirm password", hide_input=True)
+        if password != confirm:
+            click.echo("Error: Passwords do not match", err=True)
+            sys.exit(1)
+
+    if len(password) < 8:
+        click.echo("Error: Password must be at least 8 characters", err=True)
+        sys.exit(1)
+
+    config = PeekConfig()
+    config.ensure_directories()
+    engine = init_db(config.db_path)
+
+    password_hash = hash_password(password)
+    # First user is automatically admin
+    with Session(engine) as session:
+        is_first = session.exec(select(User)).first() is None
+    is_admin = admin or is_first
+
+    user = User(username=username, password_hash=password_hash, is_admin=is_admin)
+
+    try:
+        with Session(engine) as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+        admin_label = " [admin]" if is_admin else ""
+        click.echo(f"✓ Created user: {username} (id={user.id}){admin_label}")
+    except IntegrityError:
+        click.echo(f"Error: Username '{username}' already exists", err=True)
+        sys.exit(1)
+
+
+@user_cmd.command(name="list")
+def user_list() -> None:
+    """List all users (local database only)."""
+    config = PeekConfig()
+    engine = init_db(config.db_path)
+
+    with Session(engine) as session:
+        users = session.exec(select(User)).all()
+
+    if not users:
+        click.echo("No users found")
+        return
+
+    click.echo(f"Users ({len(users)}):")
+    for u in users:
+        flags = []
+        if u.is_admin:
+            flags.append("admin")
+        if not u.is_active:
+            flags.append("disabled")
+        status = ", ".join(flags) if flags else "active"
+        click.echo(f"  {u.username} (id={u.id}) [{status}]")
+
+
+@user_cmd.command(name="promote")
+@click.argument("username")
+def user_promote(username: str) -> None:
+    """Promote user to admin."""
+    config = PeekConfig()
+    engine = init_db(config.db_path)
+
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if not user:
+            click.echo(f"Error: User '{username}' not found", err=True)
+            sys.exit(1)
+        if user.is_admin:
+            click.echo(f"User '{username}' is already admin")
+            return
+        user.is_admin = True
+        session.add(user)
+        session.commit()
+    click.echo(f"✓ Promoted {username} to admin")
+
+
+@user_cmd.command(name="demote")
+@click.argument("username")
+def user_demote(username: str) -> None:
+    """Demote user from admin."""
+    config = PeekConfig()
+    engine = init_db(config.db_path)
+
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if not user:
+            click.echo(f"Error: User '{username}' not found", err=True)
+            sys.exit(1)
+        if not user.is_admin:
+            click.echo(f"User '{username}' is not admin")
+            return
+        user.is_admin = False
+        session.add(user)
+        session.commit()
+    click.echo(f"✓ Demoted {username} from admin")
+
+
+@cli.command()
+@click.option("--remote-url", "-r", required=True, help="Remote server URL")
+@click.option("--username", "-u", default=None, help="Username (prompted if not provided)")
+@click.option("--password", "-p", default=None, help="Password (prompted if not provided)")
+def login(remote_url: str, username: str | None, password: str | None) -> None:
+    """Login to a remote PeekView server.
+
+    Stores JWT token in config file for subsequent remote CLI operations.
+    """
+    from peekview.config import load_config_file, save_config_file
+
+    if username is None:
+        username = click.prompt("Username")
+    if password is None:
+        password = click.prompt("Password", hide_input=True)
+
+    client = PeekClient(base_url=remote_url)
+
+    try:
+        result = client.login(username, password)
+        token = result["access_token"]
+
+        # Save token to config
+        config_data = load_config_file()
+        if "remote" not in config_data:
+            config_data["remote"] = {}
+        config_data["remote"]["url"] = remote_url
+        config_data["remote"]["token"] = token
+        save_config_file(config_data)
+
+        user_info = result["user"]
+        click.echo(f"✓ Logged in as: {user_info['username']}")
+        click.echo(f"  Token saved to config")
+        click.echo(f"  Tip: Use 'peekview apikey create <name>' to create an API key")
+    except Exception as e:
+        click.echo(f"Error: Login failed - {e}", err=True)
+        sys.exit(1)
+
+
+@cli.group(name="apikey")
+def apikey_cmd():
+    """Manage API keys (remote mode only).
+
+    Examples:
+        peekview apikey create "CI Bot"
+        peekview apikey create "Temp" --expires 30d
+        peekview apikey list
+        peekview apikey revoke 3
+        peekview apikey cleanup
+    """
+    pass
+
+
+@apikey_cmd.command(name="create")
+@click.argument("name")
+@click.option("--expires", "-e", default=None, help="Expiration (e.g., '7d', '30d', '90d')")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL")
+def apikey_create(name: str, expires: str | None, remote_url: str | None) -> None:
+    """Create a new API key.
+
+    The full key is shown only once — save it securely.
+    """
+    config = PeekConfig()
+    backend = _get_backend(config, cli_remote_url=remote_url)
+
+    if not _is_remote_mode(backend):
+        click.echo("Error: API key management requires remote mode. Use --remote-url or configure remote.url", err=True)
+        sys.exit(1)
+
+    click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
+
+    try:
+        result = backend.create_api_key(name=name, expires_in=expires)
+        click.echo(f"✓ Created API key: {name}")
+        click.echo(f"  Key: {result['key']}")
+        click.echo(f"  Prefix: {result['key_prefix']}")
+        if result.get("expires_at"):
+            click.echo(f"  Expires: {result['expires_at']}")
+        else:
+            click.echo(f"  Expires: Never")
+        click.echo()
+        click.echo("  ⚠ Save this key now — it won't be shown again!")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@apikey_cmd.command(name="list")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL")
+def apikey_list(remote_url: str | None) -> None:
+    """List your API keys."""
+    config = PeekConfig()
+    backend = _get_backend(config, cli_remote_url=remote_url)
+
+    if not _is_remote_mode(backend):
+        click.echo("Error: API key management requires remote mode. Use --remote-url or configure remote.url", err=True)
+        sys.exit(1)
+
+    click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
+
+    try:
+        result = backend.list_api_keys()
+        items = result.get("items", [])
+
+        if not items:
+            click.echo("No API keys found")
+            return
+
+        click.echo(f"API Keys ({len(items)}):")
+        click.echo()
+        for k in items:
+            expires = k.get("expires_at", "Never") or "Never"
+            last_used = k.get("last_used_at", "Never") or "Never"
+            click.echo(f"  [{k['id']}] {k['name']}")
+            click.echo(f"      Prefix: {k['key_prefix']}")
+            click.echo(f"      Expires: {expires}")
+            click.echo(f"      Last used: {last_used}")
+            click.echo(f"      Created: {k['created_at']}")
+            click.echo()
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@apikey_cmd.command(name="revoke")
+@click.argument("key_id", type=int)
+@click.option("--remote-url", "-r", default=None, help="Remote server URL")
+@click.confirmation_option(prompt="Are you sure you want to revoke this API key?")
+def apikey_revoke(key_id: int, remote_url: str | None) -> None:
+    """Revoke an API key by ID."""
+    config = PeekConfig()
+    backend = _get_backend(config, cli_remote_url=remote_url)
+
+    if not _is_remote_mode(backend):
+        click.echo("Error: API key management requires remote mode. Use --remote-url or configure remote.url", err=True)
+        sys.exit(1)
+
+    click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
+
+    try:
+        backend.revoke_api_key(key_id)
+        click.echo(f"✓ Revoked API key: {key_id}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@apikey_cmd.command(name="cleanup")
+@click.option("--remote-url", "-r", default=None, help="Remote server URL")
+def apikey_cleanup(remote_url: str | None) -> None:
+    """Delete all expired API keys."""
+    config = PeekConfig()
+    backend = _get_backend(config, cli_remote_url=remote_url)
+
+    if not _is_remote_mode(backend):
+        click.echo("Error: API key management requires remote mode. Use --remote-url or configure remote.url", err=True)
+        sys.exit(1)
+
+    click.echo(f"→ Remote mode: {remote_url or config.remote.url}")
+
+    try:
+        result = backend.cleanup_expired_keys()
+        click.echo(f"✓ Cleaned up {result['deleted']} expired key(s)")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 

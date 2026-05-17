@@ -27,7 +27,7 @@ class TestPeekClient:
         """Test client initialization with API key."""
         client = PeekClient("https://example.com", api_key="sk-xxx")
 
-        assert client.headers == {"Authorization": "Bearer sk-xxx"}
+        assert client.headers == {"X-API-Key": "sk-xxx", "Authorization": "Bearer sk-xxx"}
 
     def test_init_with_options(self):
         """Test client initialization with all options."""
@@ -168,7 +168,7 @@ class TestPeekClientRequests:
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         assert call_args[0][0] == "https://example.com/api/v1/entries"
-        assert call_args[1]["headers"] == {"Authorization": "Bearer sk-xxx"}
+        assert call_args[1]["headers"] == {"X-API-Key": "sk-xxx", "Authorization": "Bearer sk-xxx"}
         assert call_args[1]["timeout"] == 30
         assert call_args[1]["verify"] is True
 
@@ -290,7 +290,7 @@ class TestPeekClientRequests:
 
         mock_delete.assert_called_once_with(
             "https://example.com/api/v1/entries/test-entry",
-            headers={"Authorization": "Bearer sk-xxx"},
+            headers={"X-API-Key": "sk-xxx", "Authorization": "Bearer sk-xxx"},
             timeout=30,
             verify=True,
         )

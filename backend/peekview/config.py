@@ -195,6 +195,10 @@ class PeekRemote(BaseSettings):
         default="",
         description="API key for remote authentication (empty = no auth)",
     )
+    token: str = Field(
+        default="",
+        description="JWT token for remote user authentication (from peekview login)",
+    )
     timeout: int = Field(
         default=30,
         description="HTTP request timeout in seconds",
@@ -209,6 +213,34 @@ class PeekRemote(BaseSettings):
     def validate_timeout(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("Timeout must be positive")
+        return v
+
+
+class PeekAuth(BaseSettings):
+    """Authentication configuration."""
+
+    secret_key: str = Field(
+        default="",
+        description="JWT signing key (empty = auto-generate and persist to ~/.peekview/.secret_key)",
+    )
+    token_expire_days: int = Field(
+        default=7,
+        description="JWT token validity in days",
+    )
+    allow_registration: bool = Field(
+        default=True,
+        description="Whether to allow new user registration",
+    )
+    allow_anonymous_create: bool = Field(
+        default=True,
+        description="Allow anonymous (unauthenticated) entry creation",
+    )
+
+    @field_validator("token_expire_days")
+    @classmethod
+    def validate_expire_days(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("Token expire days must be positive")
         return v
 
 
@@ -236,6 +268,7 @@ class PeekConfig(BaseSettings):
     cleanup: PeekCleanup = Field(default_factory=PeekCleanup)
     logging: PeekLogging = Field(default_factory=PeekLogging)
     remote: PeekRemote = Field(default_factory=PeekRemote)
+    auth: PeekAuth = Field(default_factory=PeekAuth)
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize config with file overrides."""

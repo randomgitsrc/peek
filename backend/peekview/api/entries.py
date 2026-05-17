@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
-from peekview.models import CreateEntryRequest, EntryUpdate
+from peekview.auth import get_current_user
+from peekview.exceptions import AuthenticationError
+from peekview.models import API_KEY_PREFIX, CreateEntryRequest, EntryUpdate, User
 from peekview.services.entry_service import EntryService, get_entry_service
 
 router = APIRouter(prefix="/api/v1/entries", tags=["entries"])
@@ -16,13 +18,50 @@ def _get_service(request: Request) -> EntryService:
     return get_entry_service(request.app)
 
 
+def _looks_like_jwt(token: str) -> bool:
+    """Heuristic: JWTs have 3 base64url-encoded segments separated by dots."""
+    parts = token.split(".")
+    return len(parts) == 3
+
+
+def _is_global_api_key_auth(request: Request, current_user: User | None) -> bool:
+    """Check if request is authenticated via global master API key (no user binding).
+
+    Only returns True for global master key — it bypasses ownership checks.
+    User-level API keys (pv_ prefix) have current_user set, treated like JWT.
+    """
+    if current_user is not None:
+        return False  # Has user = JWT or user-level key, not global key
+
+    # No user: check if request used X-API-Key or Bearer (non-JWT, non-pv_)
+    x_key = request.headers.get("X-API-Key", "")
+    if x_key and not x_key.startswith(API_KEY_PREFIX):
+        return True  # Global master key
+
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:]
+        if not _looks_like_jwt(token) and not token.startswith(API_KEY_PREFIX):
+            return True  # Global master key (Bearer backward compat)
+
+    return False
+
+
 @router.post("", status_code=201)
 async def create_entry(
     data: CreateEntryRequest,
     request: Request,
     service: EntryService = Depends(_get_service),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Create a new entry. Returns 201 Created."""
+    global_key_auth = _is_global_api_key_auth(request, current_user)
+
+    # Check anonymous create permission
+    if current_user is None and not global_key_auth:
+        if not request.app.state.config.auth.allow_anonymous_create:
+            raise AuthenticationError("Authentication required to create entries")
+
     # Convert files and dirs to dicts
     files_data = []
     for f in data.files:
@@ -41,6 +80,13 @@ async def create_entry(
     for d in data.dirs:
         dirs_data.append({"path": d.path})
 
+    # Anonymous users forced to is_public=True (API-layer enforcement)
+    is_public = data.is_public
+    if current_user is None:
+        is_public = True
+
+    current_user_id = current_user.id if current_user else None
+
     return service.create_entry(
         summary=data.summary,
         slug=data.slug,
@@ -48,6 +94,8 @@ async def create_entry(
         files_data=files_data if files_data else None,
         dirs_data=dirs_data if dirs_data else None,
         expires_in=data.expires_in,
+        is_public=is_public,
+        current_user_id=current_user_id,
     )
 
 
@@ -57,13 +105,20 @@ async def list_entries(
     q: str | None = Query(None),
     tags: str | None = Query(None),
     status: str | None = Query(None),
+    owner: str | None = Query(None, description="Filter: 'me' for own entries"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     service: EntryService = Depends(_get_service),
+    current_user: User | None = Depends(get_current_user),
 ):
     """List entries with search, filter, and pagination."""
     tag_list = tags.split(",") if tags else None
-    return service.list_entries(q=q, tags=tag_list, status=status, page=page, per_page=per_page)
+    current_user_id = current_user.id if current_user else None
+    is_admin = current_user.is_admin if current_user else False
+    return service.list_entries(
+        q=q, tags=tag_list, status=status, page=page, per_page=per_page,
+        current_user_id=current_user_id, is_admin=is_admin, owner=owner,
+    )
 
 
 @router.get("/{slug}")
@@ -71,9 +126,12 @@ async def get_entry(
     slug: str,
     request: Request,
     service: EntryService = Depends(_get_service),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Get entry details by slug."""
-    return service.get_entry(slug)
+    current_user_id = current_user.id if current_user else None
+    is_admin = current_user.is_admin if current_user else False
+    return service.get_entry(slug, current_user_id=current_user_id, is_admin=is_admin)
 
 
 @router.patch("/{slug}")
@@ -82,8 +140,11 @@ async def update_entry(
     data: EntryUpdate,
     request: Request,
     service: EntryService = Depends(_get_service),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Update an entry."""
+    global_key_auth = _is_global_api_key_auth(request, current_user)
+
     # Convert add_files to dicts
     add_files = None
     if data.add_files:
@@ -103,14 +164,21 @@ async def update_entry(
     if data.add_dirs:
         add_dirs = [{"path": d.path} for d in data.add_dirs]
 
+    current_user_id = current_user.id if current_user else None
+    is_admin = current_user.is_admin if current_user else False
+
     return service.update_entry(
         slug=slug,
         summary=data.summary,
         status=data.status,
         tags=data.tags,
+        is_public=data.is_public,
         add_files=add_files,
         remove_file_ids=data.remove_file_ids,
         add_dirs=add_dirs,
+        current_user_id=current_user_id,
+        is_api_key_auth=global_key_auth,
+        is_admin=is_admin,
     )
 
 
@@ -119,7 +187,25 @@ async def delete_entry(
     slug: str,
     request: Request,
     service: EntryService = Depends(_get_service),
+    current_user: User | None = Depends(get_current_user),
 ):
     """Delete entry by slug."""
-    service.delete_entry(slug)
+    global_key_auth = _is_global_api_key_auth(request, current_user)
+
+    if global_key_auth:
+        # Global master key: bypass ownership checks
+        service.delete_entry_by_api_key(slug)
+    else:
+        # JWT or user-level API key: normal ownership checks
+        no_server_auth = not request.app.state.config.server.api_key
+        allow_local = no_server_auth and current_user is None
+        current_user_id = current_user.id if current_user else None
+        is_admin = current_user.is_admin if current_user else False
+
+        service.delete_entry(
+            slug,
+            current_user_id=current_user_id,
+            allow_local=allow_local,
+            is_admin=is_admin,
+        )
     return {"ok": True}

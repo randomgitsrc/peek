@@ -4,10 +4,11 @@
       <component :is="Component" />
     </transition>
   </router-view>
+  <Toast />
 </template>
 
 <script setup lang="ts">
-// App root component
+import Toast from '@/components/Toast.vue'
 </script>
 
 <style>

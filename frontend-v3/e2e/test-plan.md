@@ -1,254 +1,79 @@
-# PeekView Frontend v3 E2E Test Plan
+# PeekView E2E Test Plan
 
-## 测试范围
-
-覆盖所有用户交互路径：代码查看、Markdown渲染、响应式布局、主题切换。
-
----
-
-## Test Suite 1: 代码查看 (Code Viewer)
-
-### TC-001: 代码高亮显示
-**目的:** 验证Python代码正确语法高亮
-**前置条件:** 条目`test-py`存在，包含Python文件
-**步骤:**
-1. 访问 `/#/entry/test-py`
-2. 等待Shiki加载
-**预期结果:**
-- `def`关键字显示为粉色
-- 字符串显示为浅蓝色
-- 函数名显示为紫色
-
-### TC-002: 行号显示
-**目的:** 验证行号正确渲染
-**步骤:**
-1. 访问代码文件
-2. 检查代码块结构
-**预期结果:**
-- 每行代码左侧显示行号
-- 行号从1开始递增
-- 行号样式为灰色，右对齐
-
-### TC-003: Wrap模式切换
-**目的:** 验证Wrap按钮功能
-**步骤:**
-1. 打开长行代码文件
-2. 点击Wrap按钮
-3. 观察代码换行
-4. 再次点击Wrap按钮
-**预期结果:**
-- Wrap启用：代码自动换行，无水平滚动条
-- Wrap禁用：代码不换行，显示水平滚动条
-- 按钮状态正确切换
-
-### TC-004: Copy功能
-**目的:** 验证Copy按钮复制代码到剪贴板
-**步骤:**
-1. 打开代码文件
-2. 点击Copy按钮
-3. 粘贴到文本编辑器
-**预期结果:**
-- 剪贴板内容与代码完全一致
-- 包含所有行和换行符
-
-### TC-005: 代码块Header
-**目的:** 验证Header显示正确
-**步骤:**
-1. 打开代码文件
-**预期结果:**
-- 显示文件名
-- 显示语言标签（大写）
-- 显示Copy和Wrap按钮
+> Covers all user interaction paths against a debug server at http://127.0.0.1:8888
+> Run via: `make debug-test` from project root
 
 ---
 
-## Test Suite 2: Markdown渲染
+## Test Suite 1: Basic Functionality
 
-### TC-010: Markdown基本渲染
-**目的:** 验证Markdown正确渲染为HTML
-**前置条件:** 条目`test-md`存在，包含README.md
-**步骤:**
-1. 访问 `/#/entry/test-md`
-**预期结果:**
-- 标题正确渲染（h1/h2/h3）
-- 段落有正确间距
-- 列表显示为ul/ol
+- TC-001: Health check (`GET /health` → 200)
+- TC-002: Homepage loads
+- TC-003: Create and view code entry
 
-### TC-011: TOC生成
-**目的:** 验证TOC正确提取和显示
-**步骤:**
-1. 打开Markdown文件（包含h2/h3标题）
-2. 检查右侧TOC侧边栏
-**预期结果:**
-- TOC显示所有h2/h3标题
-- 标题层级正确缩进
-- 点击TOC项跳转到对应位置
+## Test Suite 2: Mermaid Diagrams
 
-### TC-012: TOC锚点跳转
-**目的:** 验证TOC点击跳转
-**步骤:**
-1. 打开长Markdown文档
-2. 点击TOC中的标题
-**预期结果:**
-- 页面平滑滚动到对应标题
-- URL更新为 `#heading-id`
-- 标题有视觉高亮
+- TC-010: Mermaid diagram renders and fills container
+- TC-011: Mermaid code/diagram toggle preserves chart
+- TC-012: Mermaid fullscreen fills window
 
-### TC-013: Mermaid图表渲染
-**目的:** 验证Mermaid图表正确渲染
-**前置条件:** Markdown包含mermaid代码块
-**步骤:**
-1. 打开含Mermaid的Markdown
-2. 等待5秒内
-**预期结果:**
-- 代码块转换为SVG图表
-- 图表可正常显示
-- 5秒后仍未渲染则显示原始代码
+## Test Suite 3: Pagination
 
-### TC-014: Mermaid主题切换
-**目的:** 验证Mermaid随主题切换
-**步骤:**
-1. 在暗色模式查看Mermaid图表
-2. 切换到亮色模式
-**预期结果:**
-- 图表自动切换为对应主题配色
+- TC-020: Pagination shows page numbers (22+ entries)
+- TC-021: Page navigation works
 
----
+## Test Suite 4: Theme
 
-## Test Suite 3: 响应式布局
+- TC-030: Theme toggle works (data-theme attribute changes)
 
-### TC-020: 桌面端三栏布局
-**目的:** 验证桌面端显示三栏
-**步骤:**
-1. 设置视口为 1280x800
-2. 访问多文件条目
-**预期结果:**
-- 左侧显示文件树
-- 中间显示内容区
-- 右侧显示TOC（Markdown时）
+## Test Suite 5: Mobile
 
-### TC-021: 移动端单栏布局
-**目的:** 验证移动端简化布局
-**步骤:**
-1. 设置视口为 375x812
-2. 访问条目
-**预期结果:**
-- 隐藏侧边栏
-- 显示底部操作栏
-- 内容区全宽
+- TC-040: Mobile layout (375x812 — no sidebars, mobile actions visible)
+- TC-041: Single file hides Files button on mobile
+- TC-042: Multi file shows Files button with count
 
-### TC-022: 移动端文件抽屉
-**目的:** 验证多文件时抽屉菜单
-**步骤:**
-1. 移动端访问多文件条目
-2. 点击底部汉堡菜单
-**预期结果:**
-- 左侧滑出文件树抽屉
-- 点击文件后关闭抽屉
-- 点击遮罩关闭抽屉
+## Test Suite 6: Authentication
 
-### TC-023: 移动端TOC抽屉
-**目的:** 验证Markdown时TOC抽屉
-**步骤:**
-1. 移动端访问Markdown条目
-2. 点击右上角菜单按钮
-**预期结果:**
-- 右侧滑出TOC抽屉
-- 点击标题跳转并关闭抽屉
+- TC-050: Login button visible when anonymous
+- TC-051: Login dialog opens and registers
+- TC-052: Private entry invisible to anonymous, visible to owner
+- TC-053: Card shows owner actions for owned entries
+- TC-054: Visibility toggle works on card
+- TC-055: Logout clears session (token removed from localStorage)
+
+## Test Suite 7: All/Mine Tabs
+
+- TC-060: Owner tabs visible when authenticated
+- TC-061: Mine tab filters to own entries
+- TC-062: Owner tabs hidden when anonymous
+
+## Test Suite 8: API Key Management
+
+- TC-070: API Keys link in user menu dropdown
+- TC-071: API Keys page loads at `/settings/apikeys`
+- TC-072: Create API key via UI (name + expiry, full key shown once)
+- TC-073: API key can create entries (X-API-Key header, owner_id bound)
+- TC-074: Revoke API key (confirm dialog, key removed from list)
 
 ---
 
-## Test Suite 4: 主题切换
-
-### TC-030: 暗色/亮色切换
-**目的:** 验证主题切换功能
-**步骤:**
-1. 页面默认为暗色模式
-2. 点击主题切换按钮
-**预期结果:**
-- 页面切换为亮色模式
-- CSS变量正确更新
-- 代码高亮主题同步切换
-
-### TC-031: 主题持久化
-**目的:** 验证主题偏好保存
-**步骤:**
-1. 切换到亮色模式
-2. 刷新页面
-**预期结果:**
-- 页面保持亮色模式
-- localStorage存储偏好
-
----
-
-## Test Suite 5: 文件操作
-
-### TC-040: 文件选择
-**目的:** 验证文件树选择功能
-**步骤:**
-1. 访问多文件条目
-2. 点击不同文件
-**预期结果:**
-- 当前文件高亮显示
-- 内容区更新为新文件内容
-- URL更新（?file=参数）
-
-### TC-041: 单文件隐藏文件树
-**目的:** 验证单文件时隐藏文件树
-**步骤:**
-1. 访问单文件条目
-**预期结果:**
-- 不显示文件树侧边栏
-- 内容区占据更多空间
-
-### TC-042: Download功能
-**目的:** 验证Download按钮
-**步骤:**
-1. 点击Download按钮
-**预期结果:**
-- 触发文件下载
-- 下载的文件名正确
-
-### TC-043: Pack功能（多文件）
-**目的:** 验证多文件时Pack按钮
-**步骤:**
-1. 访问多文件条目
-2. 点击Pack按钮
-**预期结果:**
-- 触发zip打包下载
-
----
-
-## Test Suite 6: Entry列表
-
-### TC-050: 条目列表显示
-**目的:** 验证条目列表页
-**步骤:**
-1. 访问首页 `/`
-**预期结果:**
-- 显示条目卡片网格
-- 显示条目摘要、文件数、标签
-- 点击卡片进入详情页
-
----
-
-## 测试执行命令
+## Running Tests
 
 ```bash
-# 安装Playwright
-cd frontend-v3
-npm install -D @playwright/test
-npx playwright install chromium
+# From project root — full debug flow
+make debug-build && make debug-start && make debug-test
 
-# 运行所有测试
-npx playwright test
+# Or manually from frontend-v3/
+BASE_URL=http://127.0.0.1:8888 npx playwright test
 
-# 运行特定测试
-npx playwright test --grep "TC-001"
+# With UI mode
+BASE_URL=http://127.0.0.1:8888 npx playwright test --ui
 
-# 带UI模式调试
-npx playwright test --ui
-
-# 生成报告
-npx playwright test --reporter=html
+# Single test file
+BASE_URL=http://127.0.0.1:8888 npx playwright test e2e/debug-server.spec.ts
 ```
+
+## Test Results
+
+- Screenshots: `/tmp/e2e-results/*.png`
+- Playwright report: `frontend-v3/playwright-report/`

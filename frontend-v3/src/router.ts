@@ -13,6 +13,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/EntryDetailView.vue'),
     props: true,
   },
+  {
+    path: '/settings/apikeys',
+    name: 'api-keys',
+    component: () => import('./views/ApiKeyListView.vue'),
+  },
 ]
 
 const router = createRouter({

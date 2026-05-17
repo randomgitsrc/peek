@@ -5,6 +5,33 @@
       <span class="back-btn" @click="goBack" title="Back to list">⌂</span>
       <h1 class="title">{{ entryTitle }}</h1>
       <div class="header-right">
+        <!-- Owner controls (visibility + delete) -->
+        <template v-if="entryStore.currentEntry && authStore.isOwner(entryStore.currentEntry.ownerId)">
+          <div class="owner-actions desktop-only">
+            <button
+              class="btn btn-sm"
+              :title="entryStore.currentEntry.isPublic ? 'Make private' : 'Make public'"
+              @click="handleToggleVisibility"
+            >
+              {{ entryStore.currentEntry.isPublic ? '🌐 Public' : '🔒 Private' }}
+            </button>
+            <button
+              class="btn btn-sm btn-danger"
+              @click="confirmDeleteEntry"
+            >
+              Delete
+            </button>
+          </div>
+        </template>
+
+        <!-- Entry meta (owner + time) -->
+        <span v-if="entryStore.currentEntry?.username" class="entry-owner desktop-only">
+          @{{ entryStore.currentEntry.username }}
+        </span>
+        <span v-if="entryStore.currentEntry?.createdAt" class="entry-time desktop-only">
+          {{ formatRelativeTime(entryStore.currentEntry.createdAt) }}
+        </span>
+
         <div class="actions desktop-only" v-if="entryStore.currentEntry">
           <button
             v-if="entryStore.canWrap"
@@ -116,6 +143,22 @@
 
     <!-- Mobile Actions -->
     <div class="mobile-actions" v-if="entryStore.currentEntry">
+      <!-- Owner actions on mobile -->
+      <template v-if="authStore.isOwner(entryStore.currentEntry.ownerId)">
+        <button
+          class="btn btn-sm"
+          :title="entryStore.currentEntry.isPublic ? 'Make private' : 'Make public'"
+          @click="handleToggleVisibility"
+        >
+          {{ entryStore.currentEntry.isPublic ? '🌐' : '🔒' }}
+        </button>
+        <button
+          class="btn btn-sm btn-danger"
+          @click="confirmDeleteEntry"
+        >
+          🗑️
+        </button>
+      </template>
       <button
         v-if="entryStore.isMultiFile"
         class="btn btn-sm menu-btn"
@@ -181,6 +224,17 @@
         @select="selectTocAndCloseDrawer"
       />
     </aside>
+
+    <!-- Confirm dialog for delete -->
+    <ConfirmDialog
+      v-model:visible="showConfirmDelete"
+      title="Delete Entry"
+      :message="deleteMessage"
+      confirm-label="Delete"
+      variant="destructive"
+      @confirm="handleDelete"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>
 
@@ -189,11 +243,14 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useEntryStore } from '@/stores/entry'
+import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 import CodeViewer from '@/components/CodeViewer.vue'
 import MarkdownViewer from '@/components/MarkdownViewer.vue'
 import FileTree from '@/components/FileTree.vue'
 import TocNav from '@/components/TocNav.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import type { TocHeading } from '@/types'
 
 const props = defineProps<{
@@ -202,11 +259,51 @@ const props = defineProps<{
 
 const router = useRouter()
 const entryStore = useEntryStore()
+const authStore = useAuthStore()
+const toast = useToast()
 const { currentEntry, activeFile } = storeToRefs(entryStore)
 
 // Drawer state
 const showFileDrawer = ref(false)
 const showTocDrawer = ref(false)
+
+// Delete confirmation
+const showConfirmDelete = ref(false)
+const deleteMessage = computed(() =>
+  currentEntry.value
+    ? `Are you sure you want to delete "${currentEntry.value.summary}"?`
+    : ''
+)
+
+function confirmDeleteEntry() {
+  showConfirmDelete.value = true
+}
+
+async function handleDelete() {
+  if (!currentEntry.value) return
+  const success = await entryStore.deleteEntry(currentEntry.value.slug)
+  if (success) {
+    toast.show('Entry deleted', 'success')
+    router.push('/')
+  } else {
+    toast.show('Failed to delete entry', 'error')
+  }
+}
+
+function cancelDelete() {
+  // ConfirmDialog already sets visible=false
+}
+
+// Visibility toggle
+async function handleToggleVisibility() {
+  if (!currentEntry.value) return
+  const success = await entryStore.toggleVisibility(currentEntry.value)
+  if (success) {
+    toast.show(currentEntry.value.isPublic ? 'Entry made public' : 'Entry made private', 'success')
+  } else {
+    toast.show('Failed to change visibility', 'error')
+  }
+}
 
 // Computed properties
 const entryTitle = computed(() => {
@@ -280,7 +377,6 @@ function downloadFile() {
 
 function downloadPack() {
   if (!currentEntry.value) return
-  // Pack download logic - would call API to get zip
   console.log('Download pack for:', currentEntry.value.slug)
 }
 
@@ -293,18 +389,15 @@ function extractHeadings(content: string): TocHeading[] {
     const match = line.match(/^(#{1,6})\s+(.+)$/)
     if (match) {
       const level = match[1].length
-      // Only include h2-h4 headings (same as useMarkdown.ts)
       if (level < 2 || level > 4) continue
 
       const text = match[2].trim()
-      // Match the slugify logic from useMarkdown.ts - preserve CJK characters
       let id = text.toLowerCase()
-        .replace(/[^\w\s一-龥぀-ゟ゠-ヿ-]/g, '')  // Keep CJK, hiragana, katakana
+        .replace(/[^\w\s一-龥぀-ゟ゠-ヿ-]/g, '')
         .replace(/\s+/g, '-')
-        .replace(/^-+|-+$/g, '')  // Trim leading/trailing dashes
-        .substring(0, 50) || 'heading'  // Fallback if empty
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 50) || 'heading'
 
-      // Ensure unique IDs
       let uniqueId = id
       let counter = 1
       while (usedIds.has(uniqueId)) {
@@ -318,6 +411,28 @@ function extractHeadings(content: string): TocHeading[] {
   }
 
   return headings
+}
+
+// Relative time formatter
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffHour = Math.floor(diffMin / 60)
+  const diffDay = Math.floor(diffHour / 24)
+  const diffWeek = Math.floor(diffDay / 7)
+  const diffMonth = Math.floor(diffDay / 30)
+  const diffYear = Math.floor(diffDay / 365)
+
+  if (diffSec < 60) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffHour < 24) return `${diffHour}h ago`
+  if (diffDay < 7) return `${diffDay}d ago`
+  if (diffWeek < 5) return `${diffWeek}w ago`
+  if (diffMonth < 12) return `${diffMonth}mo ago`
+  return `${diffYear}y ago`
 }
 
 // Load entry on mount and when slug changes
@@ -360,6 +475,15 @@ watch(() => props.slug, (newSlug) => {
   font-size: var(--font-xs);
 }
 
+.btn-danger {
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.btn-danger:hover {
+  background: var(--error-bg);
+}
+
 .header-right {
   display: flex;
   align-items: center;
@@ -371,6 +495,22 @@ watch(() => props.slug, (newSlug) => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.owner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.entry-owner {
+  font-size: var(--font-xs);
+  color: var(--accent-color);
+}
+
+.entry-time {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
 }
 </style>
 

@@ -56,6 +56,16 @@
   --warning-color: #9a6700;
   --error-color: #cf222e;
 
+  --success-bg: rgba(26, 127, 55, 0.1);
+  --success-text: #1a7f37;
+  --success-border: rgba(26, 127, 55, 0.3);
+  --warning-bg: rgba(154, 103, 0, 0.1);
+  --warning-text: #9a6700;
+  --warning-border: rgba(154, 103, 0, 0.3);
+  --error-bg: rgba(207, 34, 46, 0.1);
+  --error-text: #cf222e;
+  --error-border: rgba(207, 34, 46, 0.3);
+
   --tag-bg: rgba(9, 105, 218, 0.1);
   --tag-text: #0969da;
 
@@ -86,6 +96,16 @@
   --success-color: #3fb950;
   --warning-color: #d29922;
   --error-color: #f85149;
+
+  --success-bg: rgba(63, 185, 80, 0.15);
+  --success-text: #3fb950;
+  --success-border: rgba(63, 185, 80, 0.4);
+  --warning-bg: rgba(210, 153, 34, 0.15);
+  --warning-text: #d29922;
+  --warning-border: rgba(210, 153, 34, 0.4);
+  --error-bg: rgba(248, 81, 73, 0.15);
+  --error-text: #f85149;
+  --error-border: rgba(248, 81, 73, 0.4);
 
   --tag-bg: rgba(59, 130, 246, 0.2);
   --tag-text: #58a6ff;

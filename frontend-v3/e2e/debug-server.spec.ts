@@ -23,7 +23,8 @@ async function createTestEntry(page: any, slug: string, data: any) {
       slug,
       summary: data.summary || 'Test Entry',
       expires_in: '1h',  // 自动1小时过期
-      files: data.files || []
+      files: data.files || [],
+      is_public: data.is_public !== undefined ? data.is_public : true,
     }
   })
   if (response.ok()) {
@@ -179,16 +180,18 @@ graph TD
 
 test.describe('Debug Server - Pagination', () => {
   test('pagination shows page numbers', async ({ page }) => {
-    // Create multiple entries to trigger pagination
-    for (let i = 1; i <= 15; i++) {
-      await createTestEntry(page, `e2e-page-test-${i}`, {
+    // Create enough entries to trigger pagination (perPage=20, need >20)
+    const ts = Date.now()
+    for (let i = 1; i <= 22; i++) {
+      await createTestEntry(page, `e2e-page-${ts}-${i}`, {
         summary: `Pagination Test ${i}`,
         files: [{ filename: 'test.txt', content: `Test ${i}` }]
       })
     }
 
     await page.goto('/')
-    await page.waitForTimeout(1000)
+    // Wait for entries to load
+    await page.waitForSelector('.entry-card', { timeout: 10000 })
 
     // Check pagination exists
     const pagination = page.locator('.pagination')
@@ -202,14 +205,23 @@ test.describe('Debug Server - Pagination', () => {
   })
 
   test('page navigation works', async ({ page }) => {
+    // Create enough entries to trigger pagination
+    const ts = Date.now()
+    for (let i = 1; i <= 22; i++) {
+      await createTestEntry(page, `e2e-pagenav-${ts}-${i}`, {
+        summary: `Page Nav Test ${i}`,
+        files: [{ filename: 'test.txt', content: `Test ${i}` }]
+      })
+    }
+
     await page.goto('/')
-    await page.waitForTimeout(1000)
+    await page.waitForSelector('.pagination', { timeout: 10000 })
 
     // Get first page entries
     const firstPageEntries = await page.locator('.entry-card').count()
 
     // Go to page 2
-    await page.click('.pagination .page-num:nth-child(2)')
+    await page.click('.page-num:not(.active)')
     await page.waitForTimeout(1000)
 
     // Verify different content
@@ -311,5 +323,429 @@ test.describe('Debug Server - Mobile', () => {
     await expect(filesButton).toContainText('Files (3)')
 
     await page.screenshot({ path: '/tmp/e2e-results/11-mobile-multi-file.png' })
+  })
+})
+
+// ========================================
+// Test Suite 6: Authentication
+// ========================================
+
+test.describe('Debug Server - Auth', () => {
+  test('login button visible when anonymous', async ({ page }) => {
+    await page.goto('/')
+    // Wait for auth initialization to complete
+    await page.waitForSelector('.btn-login, .user-menu-trigger', { timeout: 10000 })
+    await expect(page.locator('.btn-login')).toBeVisible()
+    await page.screenshot({ path: '/tmp/e2e-results/20-login-button.png' })
+  })
+
+  test('login dialog opens and registers', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForSelector('.btn-login', { timeout: 10000 })
+
+    // Click Login button
+    await page.click('.btn-login')
+    await page.waitForTimeout(500)
+
+    // Dialog should be visible
+    await expect(page.locator('.login-dialog')).toBeVisible()
+
+    // Switch to Register mode
+    await page.click('.login__switch-btn')
+    await page.waitForTimeout(300)
+
+    // Fill registration form with unique username
+    const uniqueUser = `e2e_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    await page.fill('#login-username', uniqueUser)
+    await page.fill('#login-password', 'e2epass123')
+    await page.fill('#login-confirm', 'e2epass123')
+
+    // Submit
+    await page.click('.login__submit')
+    // Wait for dialog to close (indicates success)
+    await expect(page.locator('.login-dialog')).not.toBeVisible({ timeout: 10000 })
+
+    // User menu should appear
+    await expect(page.locator('.user-menu-trigger')).toBeVisible()
+
+    await page.screenshot({ path: '/tmp/e2e-results/21-registered.png' })
+  })
+
+  test('private entry invisible to anonymous, visible to owner', async ({ page }) => {
+    // Register and get token with unique username
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `private_${ts}`, password: 'privpass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Create private entry with JWT
+    const createResp = await page.request.post('/api/v1/entries', {
+      data: {
+        summary: 'Private E2E Entry',
+        is_public: false,
+        files: [{ filename: 'secret.py', content: 'SECRET = 42' }],
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(createResp.status()).toBe(201)
+    const entry = await createResp.json()
+
+    // Anonymous: entry should NOT appear in list
+    const anonList = await page.request.get('/api/v1/entries')
+    const anonData = await anonList.json()
+    const anonFound = anonData.items.some((i: any) => i.slug === entry.slug)
+    expect(anonFound).toBeFalsy()
+
+    // Anonymous: direct access should 404
+    const anonDetail = await page.request.get(`/api/v1/entries/${entry.slug}`)
+    expect(anonDetail.status()).toBe(404)
+
+    // Owner: entry SHOULD appear in list
+    const ownerList = await page.request.get('/api/v1/entries', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const ownerData = await ownerList.json()
+    const ownerFound = ownerData.items.some((i: any) => i.slug === entry.slug)
+    expect(ownerFound).toBeTruthy()
+
+    await page.screenshot({ path: '/tmp/e2e-results/22-private-visibility.png' })
+  })
+
+  test('card shows owner actions for owned entries', async ({ page }) => {
+    // Register with unique username
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `card_${ts}`, password: 'cardpass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Create entry as this user
+    await page.request.post('/api/v1/entries', {
+      data: {
+        summary: 'My Owned Entry',
+        files: [{ filename: 'hello.py', content: 'print("hi")' }],
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    // Login in UI
+    await page.goto('/')
+    // Set token in localStorage before app loads
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    // Wait for auth initialization + user menu
+    await page.waitForSelector('.user-menu-trigger', { timeout: 10000 })
+
+    // Card should have owner actions
+    const cardActions = page.locator('.card-actions')
+    await expect(cardActions.first()).toBeVisible()
+
+    await page.screenshot({ path: '/tmp/e2e-results/23-owner-card.png' })
+  })
+
+  test('visibility toggle works on card', async ({ page }) => {
+    // Register with unique username
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `toggle_${ts}`, password: 'togglepass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Create private entry
+    const createResp = await page.request.post('/api/v1/entries', {
+      data: {
+        summary: 'Toggle Test Entry',
+        is_public: false,
+        files: [{ filename: 'code.py', content: 'x = 1' }],
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(createResp.status()).toBe(201)
+
+    // Login in UI
+    await page.goto('/')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    await page.waitForSelector('.user-menu-trigger', { timeout: 10000 })
+
+    // Find the visibility toggle button
+    const toggleBtn = page.locator('.card-action-btn').first()
+    await expect(toggleBtn).toBeVisible()
+    await toggleBtn.click()
+    await page.waitForTimeout(1000)
+
+    // Toast should appear
+    await expect(page.locator('.toast')).toBeVisible()
+
+    await page.screenshot({ path: '/tmp/e2e-results/24-visibility-toggle.png' })
+  })
+
+  test('logout clears session', async ({ page }) => {
+    // Register with unique username
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `logout_${ts}`, password: 'logoutpass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Login in UI
+    await page.goto('/')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    await page.waitForSelector('.user-menu-trigger', { timeout: 10000 })
+
+    // Click user menu to open dropdown
+    await page.click('.user-menu-trigger')
+    await page.waitForTimeout(300)
+
+    // Click Logout (last dropdown item)
+    const logoutBtn = page.locator('.dropdown-item').last()
+    await logoutBtn.click()
+    await page.waitForTimeout(500)
+
+    // Should see Login button again
+    await expect(page.locator('.btn-login')).toBeVisible()
+    // Token should be cleared
+    const savedToken = await page.evaluate(() => localStorage.getItem('peekview_token'))
+    expect(savedToken).toBeNull()
+
+    await page.screenshot({ path: '/tmp/e2e-results/25-logout.png' })
+  })
+})
+
+// ========================================
+// Test Suite 7: All/Mine Tabs
+// ========================================
+
+test.describe('Debug Server - All/Mine Tabs', () => {
+  test('owner tabs visible when authenticated', async ({ page }) => {
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `tabs_${ts}`, password: 'tabspass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    await page.goto('/')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    await page.waitForSelector('.user-menu-trigger', { timeout: 10000 })
+
+    // Tabs should be visible
+    await expect(page.locator('.owner-tabs')).toBeVisible()
+    await expect(page.locator('.owner-tab').first()).toContainText('All')
+    await expect(page.locator('.owner-tab').last()).toContainText('Mine')
+
+    await page.screenshot({ path: '/tmp/e2e-results/30-owner-tabs.png' })
+  })
+
+  test('Mine tab filters to own entries', async ({ page }) => {
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `mine_${ts}`, password: 'minepass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Create entry as this user
+    await page.request.post('/api/v1/entries', {
+      data: {
+        summary: 'My Entry',
+        files: [{ filename: 'mine.py', content: 'x = 1' }],
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    await page.goto('/')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    await page.waitForSelector('.owner-tabs', { timeout: 10000 })
+
+    // Click "Mine" tab
+    await page.click('.owner-tab:last-child')
+
+    // Wait for entries to load (may need API call)
+    await page.waitForSelector('.entry-card, .empty', { timeout: 10000 })
+
+    // Should show at least one entry
+    const entries = await page.locator('.entry-card').count()
+    expect(entries).toBeGreaterThanOrEqual(1)
+
+    await page.screenshot({ path: '/tmp/e2e-results/31-mine-tab.png' })
+  })
+
+  test('owner tabs hidden when anonymous', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForSelector('.btn-login, .user-menu-trigger', { timeout: 10000 })
+    await expect(page.locator('.owner-tabs')).not.toBeVisible()
+  })
+})
+
+// ========================================
+// Test Suite 8: API Key Management
+// ========================================
+
+test.describe('Debug Server - API Keys', () => {
+  test('API Keys link in user menu', async ({ page }) => {
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `apikey_${ts}`, password: 'apikeypass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    await page.goto('/')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    await page.waitForSelector('.user-menu-trigger', { timeout: 10000 })
+
+    // Open user menu
+    await page.click('.user-menu-trigger')
+    await page.waitForTimeout(300)
+
+    // "API Keys" dropdown item should be visible
+    await expect(page.locator('.dropdown-item').first()).toContainText('API Keys')
+
+    await page.screenshot({ path: '/tmp/e2e-results/40-apikey-menu.png' })
+  })
+
+  test('API Keys page loads', async ({ page }) => {
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `apikeypage_${ts}`, password: 'apikeypass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Go to API Keys page directly, set token, and reload
+    await page.goto('/settings/apikeys')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    // Wait for page content to render (h1 may take time due to auth init)
+    await page.waitForSelector('.apikey-page', { timeout: 15000 })
+
+    // Should be on API Keys page
+    await expect(page.locator('.apikey-page h1')).toContainText('API Keys')
+
+    await page.screenshot({ path: '/tmp/e2e-results/41-apikey-page.png' })
+  })
+
+  test('create API key via UI', async ({ page }) => {
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `keycreate_${ts}`, password: 'keypass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    // Navigate to API Keys page
+    await page.goto('/settings/apikeys')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    // Wait for auth to initialize and page to render
+    await page.waitForSelector('.apikey-page', { timeout: 15000 })
+
+    // Click Create Key button
+    await page.click('.apikey-page .btn-primary')
+    await page.waitForTimeout(500)
+
+    // Dialog should be visible
+    await expect(page.locator('.dialog')).toBeVisible()
+
+    // Fill key name
+    await page.fill('#key-name', 'E2E Test Key')
+
+    // Click Create
+    await page.click('.dialog .btn-primary')
+    await page.waitForTimeout(2000)
+
+    // Should show the created key
+    await expect(page.locator('.key-value')).toBeVisible()
+
+    await page.screenshot({ path: '/tmp/e2e-results/42-apikey-created.png' })
+
+    // Dismiss the dialog
+    await page.click('.dialog .btn-primary')
+    await page.waitForTimeout(500)
+
+    // Key card should appear in list
+    await expect(page.locator('.key-card')).toBeVisible()
+    await expect(page.locator('.key-name')).toContainText('E2E Test Key')
+
+    await page.screenshot({ path: '/tmp/e2e-results/43-apikey-list.png' })
+  })
+
+  test('API key can create entries', async ({ page }) => {
+    // Create user and API key via API
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `keyentry_${ts}`, password: 'keypass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    const keyResp = await page.request.post('/api/v1/apikeys', {
+      data: { name: 'E2E Auto Key' },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(keyResp.status()).toBe(201)
+    const keyData = await keyResp.json()
+    const apiKey = keyData.key
+
+    // Use API key to create entry
+    const entryResp = await page.request.post('/api/v1/entries', {
+      data: {
+        summary: 'Created via API Key',
+        files: [{ filename: 'auto.py', content: 'result = api_key_works()' }],
+      },
+      headers: { 'X-API-Key': apiKey },
+    })
+    expect(entryResp.status()).toBe(201)
+
+    const entry = await entryResp.json()
+    expect(entry.owner_id).toBeTruthy()
+  })
+
+  test('revoke API key', async ({ page }) => {
+    // Create user and API key via API
+    const ts = Date.now()
+    const regResp = await page.request.post('/api/v1/auth/register', {
+      data: { username: `keyrevoke_${ts}`, password: 'keypass123' }
+    })
+    const regData = await regResp.json()
+    const token = regData.access_token
+
+    const keyResp = await page.request.post('/api/v1/apikeys', {
+      data: { name: 'Revoke Me' },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const keyData = await keyResp.json()
+    const keyId = keyData.id
+
+    // Navigate to API Keys page
+    await page.goto('/settings/apikeys')
+    await page.evaluate((t: string) => localStorage.setItem('peekview_token', t), token)
+    await page.reload()
+    await page.waitForSelector('.apikey-page', { timeout: 15000 })
+    await page.waitForSelector('.key-card', { timeout: 10000 })
+
+    // Click Revoke button
+    await page.click('.btn-danger')
+    await page.waitForTimeout(500)
+
+    // Confirm dialog should appear
+    await expect(page.locator('.confirm-dialog')).toBeVisible()
+    await page.click('.confirm-dialog .confirm__btn--destructive')
+    await page.waitForTimeout(1000)
+
+    // Key should be removed from list
+    await expect(page.locator('.key-card')).not.toBeVisible()
+
+    await page.screenshot({ path: '/tmp/e2e-results/44-apikey-revoked.png' })
   })
 })

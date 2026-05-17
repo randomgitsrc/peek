@@ -77,6 +77,19 @@ def create_app(
     # Ensure directories exist
     config.data_dir.mkdir(parents=True, exist_ok=True)
 
+    # Initialize database and services
+    engine = init_db(config.db_path)
+    app.state.engine = engine
+
+    from peekview.storage import StorageManager
+    from peekview.services.entry_service import EntryService
+    from peekview.services.apikey_service import ApiKeyService
+    storage = StorageManager(config=config)
+    entry_service = EntryService(engine=engine, storage=storage, config=config)
+    apikey_service = ApiKeyService(engine=engine)
+    app.state.entry_service = entry_service
+    app.state.apikey_service = apikey_service
+
     # Setup CORS - use config or default
     cors_origins = getattr(config, 'cors_origins', ["http://localhost:5173"])
     if isinstance(cors_origins, str):
@@ -102,10 +115,35 @@ def create_app(
             if request.url.path.startswith("/assets") or request.url.path == "/":
                 return await call_next(request)
 
+            # Skip auth for auth endpoints (JWT handles these)
+            if request.url.path.startswith("/api/v1/auth"):
+                return await call_next(request)
+
+            # Skip auth for API key management endpoints (require JWT)
+            if request.url.path.startswith("/api/v1/apikeys"):
+                return await call_next(request)
+
+            # Pass through user-level API keys (pv_ prefix) — handled by get_current_user
+            x_api_key = request.headers.get("X-API-Key", "")
+            if x_api_key.startswith("pv_"):
+                return await call_next(request)
+
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
-                if token == api_key:
+                if token.startswith("pv_"):
+                    return await call_next(request)
+
+            # Check X-API-Key header (global master key)
+            if x_api_key == api_key:
+                return await call_next(request)
+
+            # Check Authorization: Bearer (backward compat, only for non-JWT tokens)
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                # If token looks like JWT (3 segments), skip — it's user auth
+                if len(token.split(".")) != 3 and token == api_key:
                     return await call_next(request)
 
             return JSONResponse(
@@ -126,8 +164,12 @@ def create_app(
         return response
 
     # Register API routes
+    from peekview.api.auth import router as auth_router
+    from peekview.api.apikeys import router as apikeys_router
     from peekview.api.entries import router as entries_router
     from peekview.api.files import router as files_router
+    app.include_router(auth_router)
+    app.include_router(apikeys_router)
     app.include_router(entries_router)
     app.include_router(files_router)
 

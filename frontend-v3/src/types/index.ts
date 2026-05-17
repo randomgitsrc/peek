@@ -6,7 +6,10 @@ export interface Entry {
   tags: string[]
   status: 'active' | 'expired'
   files: File[]
-  fileCount?: number // For list view where files array is not populated
+  fileCount?: number
+  isPublic: boolean
+  ownerId: number | null
+  username: string | null
   createdAt: string
 }
 
@@ -32,6 +35,7 @@ export interface ListEntriesParams {
   q?: string
   tags?: string[]
   status?: string
+  owner?: string
   page?: number
   perPage?: number
 }
@@ -45,3 +49,40 @@ export interface TocHeading {
 
 // Theme
 export type Theme = 'light' | 'dark'
+
+// Auth types
+export interface User {
+  id: number
+  username: string
+  displayName: string | null
+  isActive: boolean
+  isAdmin: boolean
+  createdAt: string
+}
+
+export interface AuthResponse {
+  accessToken: string
+  tokenType: string
+  user: User
+}
+
+export type AuthState = 'loading' | 'authenticated' | 'anonymous'
+
+// API Key types
+export interface ApiKey {
+  id: number
+  name: string
+  keyPrefix: string
+  expiresAt: string | null
+  lastUsedAt: string | null
+  createdAt: string
+}
+
+export interface ApiKeyCreateResult {
+  id: number
+  name: string
+  key: string
+  keyPrefix: string
+  expiresAt: string | null
+  createdAt: string
+}

@@ -107,6 +107,46 @@ class ConflictError(PeekError):
     error_code = "CONFLICT"
 
 
+class AuthenticationError(PeekError):
+    """Authentication required or failed.
+
+    Raised when a user is not authenticated or credentials are invalid.
+    """
+
+    status_code = 401
+    error_code = "NOT_AUTHENTICATED"
+
+
+class RegistrationError(PeekError):
+    """Registration failed.
+
+    Raised when user registration fails (generic error to prevent enumeration).
+    """
+
+    status_code = 400
+    error_code = "REGISTRATION_FAILED"
+
+
+class InvalidCredentialsError(PeekError):
+    """Invalid login credentials.
+
+    Raised when username or password is incorrect (generic to prevent enumeration).
+    """
+
+    status_code = 401
+    error_code = "INVALID_CREDENTIALS"
+
+
+class ForbiddenError(PeekError):
+    """Operation not permitted.
+
+    Raised when a user attempts an action they don't have permission for.
+    """
+
+    status_code = 403
+    error_code = "FORBIDDEN"
+
+
 class StorageError(PeekError):
     """File storage operation failed.
 

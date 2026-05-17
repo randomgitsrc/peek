@@ -117,6 +117,55 @@ export const useEntryStore = defineStore('entry', () => {
     error.value = null
   }
 
+  async function toggleVisibility(entry: Entry): Promise<boolean> {
+    // Optimistic update
+    const originalPublic = entry.isPublic
+    const index = entries.value.findIndex(e => e.id === entry.id)
+    const newPublic = !originalPublic
+
+    // Update locally first
+    entry.isPublic = newPublic
+    if (index >= 0) {
+      entries.value[index] = { ...entries.value[index], isPublic: newPublic }
+    }
+    if (currentEntry.value?.id === entry.id) {
+      currentEntry.value = { ...currentEntry.value, isPublic: newPublic }
+    }
+
+    try {
+      await api.toggleEntryVisibility(entry.slug, newPublic)
+      return true
+    } catch {
+      // Rollback on failure
+      entry.isPublic = originalPublic
+      if (index >= 0) {
+        entries.value[index] = { ...entries.value[index], isPublic: originalPublic }
+      }
+      if (currentEntry.value?.id === entry.id) {
+        currentEntry.value = { ...currentEntry.value, isPublic: originalPublic }
+      }
+      return false
+    }
+  }
+
+  async function deleteEntry(slug: string): Promise<boolean> {
+    try {
+      await api.deleteEntry(slug)
+      entries.value = entries.value.filter(e => e.slug !== slug)
+      if (currentEntry.value?.slug === slug) {
+        clearEntry()
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  function filterPrivateEntries(): void {
+    // Used after logout to immediately remove private entries from the list
+    entries.value = entries.value.filter(e => e.isPublic)
+  }
+
   return {
     // State
     entries,
@@ -142,5 +191,8 @@ export const useEntryStore = defineStore('entry', () => {
     selectFile,
     toggleWrap,
     clearEntry,
+    toggleVisibility,
+    deleteEntry,
+    filterPrivateEntries,
   }
 })
