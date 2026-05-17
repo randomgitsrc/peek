@@ -1,93 +1,103 @@
-# PeekView
+# PeekView — Backend API Documentation
 
-A lightweight code & document formatting display service.
+> A lightweight code & document formatting display service.
 
-> Agent（AI）产出 → Peek 格式化 → 人类友好查看
+## Quick Start
 
-## 快速开始
-
-### 安装
+### Install
 
 ```bash
 pip install peekview
 ```
 
-### 启动服务
+### Start Server
 
 ```bash
-# 本地开发
-peekview serve
-
-# 生产部署（指定端口和主机）
-peekview serve --host 0.0.0.0 --port 8080
+peekview serve                          # Local development
+peekview serve --host 0.0.0.0 --port 8080  # Production
 ```
 
-服务启动后，访问 http://localhost:8080 即可使用 Web 界面。
+## CLI Commands
 
-## 命令行用法
-
-### 创建条目
+### Entry Management
 
 ```bash
-# 从文件创建
-peekview create file.txt -s "My document"
+peekview create file.txt -s "My document"                    # Create from file
+peekview create src/*.py -s "Project" -t python -t cli       # Multi-file + tags
+echo "code" | peekview create -s "From stdin" --from-stdin   # From pipe
+peekview create file.py -s "Private" --visibility private     # Private entry
 
-# 从多文件创建
-peekview create src/*.py -s "Python project" -t python -t cli
-
-# 从标准输入创建
-echo "print('hello')" | peekview create -s "From stdin" --from-stdin
-
-# 指定自定义 slug
-peekview create README.md -s "Documentation" --slug docs
+peekview get my-entry                 # Show details
+peekview list                         # List entries
+peekview list -q "python"             # FTS5 search
+peekview list -t python -t cli        # Tag filter
+peekview delete my-entry              # Delete (with confirmation)
 ```
 
-### 查看条目
+### User Management
 
 ```bash
-# 查看条目详情
-peekview get my-entry
-
-# 列出入库（支持分页）
-peekview list
-peekview list --page 2 --per-page 50
-
-# 搜索条目（FTS5 全文搜索）
-peekview list -q "python function"
-
-# 按标签过滤
-peekview list -t python -t cli
+peekview user create <username>       # Create user (prompts for password)
+peekview user list                    # List users
+peekview user promote <username>      # Promote to admin
+peekview user demote <username>       # Demote from admin
 ```
 
-### 删除条目
+### Remote Authentication
 
 ```bash
-# 删除条目（会要求确认）
-peekview delete my-entry
-
-# 强制删除（无需确认）
-peekview delete my-entry --force
+peekview login --remote-url <url> --username <user>  # Login to remote server
 ```
 
-## 配置
+### API Key Management
 
-### 环境变量
+```bash
+peekview apikey create "CI Bot"       # Create API key
+peekview apikey create "Temp" --expires 30d  # With expiration
+peekview apikey list                  # List keys
+peekview apikey revoke <key_id>       # Revoke key
+peekview apikey cleanup               # Remove expired keys
+```
 
-通过环境变量配置（注意 `__` 分隔符用于嵌套配置）：
+### Service Management
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | 文件存储目录 |
-| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peek.db` | SQLite 数据库路径 |
-| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | 允许读取的本地路径列表 |
-| `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | 服务绑定地址 |
-| `PEEKVIEW_SERVER__PORT` | `8080` | 服务端口 |
-| `PEEKVIEW_SERVER__API_KEY` | `` | API 认证密钥（可选） |
-| `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS 允许来源 |
+```bash
+peekview service install --base-url https://example.com  # Systemd/launchd
+peekview service install --user
+peekview service status / start / stop / uninstall
+```
 
-### 配置文件
+## Configuration
 
-推荐将配置写入 `~/.peekview/config.yaml`：
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PEEKVIEW_SERVER__HOST` | `127.0.0.1` | Server bind address |
+| `PEEKVIEW_SERVER__PORT` | `8080` | Server port |
+| `PEEKVIEW_SERVER__BASE_URL` | `""` | External URL (for reverse proxy) |
+| `PEEKVIEW_SERVER__API_KEY` | `""` | Global API key for service-level auth |
+| `PEEKVIEW_SERVER__CORS_ORIGINS` | `http://localhost:5173` | CORS allowed origins |
+| `PEEKVIEW_STORAGE__DATA_DIR` | `~/.peekview/data` | File storage directory |
+| `PEEKVIEW_STORAGE__DB_PATH` | `~/.peekview/peekview.db` | SQLite database path |
+| `PEEKVIEW_STORAGE__ALLOWED_PATHS` | `[]` | Allowlist for local_path reads |
+| `PEEKVIEW_AUTH__SECRET_KEY` | `""` | JWT signing key (empty = auto-generate) |
+| `PEEKVIEW_AUTH__TOKEN_EXPIRE_DAYS` | `7` | JWT token validity in days |
+| `PEEKVIEW_AUTH__ALLOW_REGISTRATION` | `true` | Allow new user registration |
+| `PEEKVIEW_AUTH__ALLOW_ANONYMOUS_CREATE` | `true` | Allow anonymous entry creation |
+| `PEEKVIEW_LIMITS__MAX_FILE_SIZE` | `10485760` | Max single file size (10MB) |
+| `PEEKVIEW_LIMITS__MAX_ENTRY_FILES` | `50` | Max files per entry |
+| `PEEKVIEW_LIMITS__MAX_PER_PAGE` | `50` | Max items per page |
+| `PEEKVIEW_CLEANUP__CHECK_ON_START` | `true` | Check expired entries on startup |
+| `PEEKVIEW_CLEANUP__INTERVAL_SECONDS` | `3600` | Cleanup interval (0 = disabled) |
+| `PEEKVIEW_LOGGING__LEVEL` | `INFO` | Log level (DEBUG/INFO/WARNING/ERROR) |
+| `PEEKVIEW_REMOTE__URL` | `""` | Remote server URL for CLI remote mode |
+| `PEEKVIEW_REMOTE__API_KEY` | `""` | API key for remote server |
+| `PEEKVIEW_REMOTE__TOKEN` | `""` | JWT token for remote user auth |
+
+### Config File
+
+`~/.peekview/config.yaml`:
 
 ```yaml
 server:
@@ -96,87 +106,114 @@ server:
   base_url: https://peek.example.com
 storage:
   data_dir: /var/peekview/data
-  db_path: /var/peekview/peek.db
+  db_path: /var/peekview/peekview.db
+auth:
+  secret_key: ""
+  token_expire_days: 7
+  allow_registration: true
+  allow_anonymous_create: true
+limits:
+  max_file_size: 10485760
+  max_entry_files: 50
+  max_per_page: 50
+remote:
+  url: ""
+  api_key: ""
+  token: ""
 ```
 
-或使用 `.env` 文件（Docker/临时配置）：
+## API Endpoints
 
-```bash
-PEEKVIEW_STORAGE__DATA_DIR=/var/peekview/data
-PEEKVIEW_STORAGE__DB_PATH=/var/peekview/peek.db
-PEEKVIEW_SERVER__HOST=0.0.0.0
-PEEKVIEW_SERVER__PORT=8080
-PEEKVIEW_SERVER__API_KEY=your-secret-key
+### Health Check
+
+```
+GET /health → { "status": "ok", "version": "0.1.26" }
 ```
 
-## API 端点
+### Entry API
 
-### 健康检查
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/v1/entries` | List entries (pagination, search, tag filter, owner filter) | Optional |
+| POST | `/api/v1/entries` | Create entry | Optional* |
+| GET | `/api/v1/entries/{slug}` | Get entry details | Optional* |
+| PATCH | `/api/v1/entries/{slug}` | Update entry (including visibility toggle) | Owner/Admin |
+| DELETE | `/api/v1/entries/{slug}` | Delete entry | Owner/Admin |
+| GET | `/api/v1/entries/{slug}/files/{file_id}` | Get file info | - |
+| GET | `/api/v1/entries/{slug}/files/{file_id}/content` | Get file content | - |
 
-```bash
-GET /health
-```
+\* Private entries require authentication. Entry creation may require auth if `allow_anonymous_create=false`.
 
-返回服务健康状态：
+**Query Parameters for GET /api/v1/entries:**
+- `page`, `per_page` — Pagination
+- `q` — FTS5 full-text search
+- `tag` — Tag filter (repeatable)
+- `owner` — Owner filter (`owner=me` for current user's entries)
 
-```json
-{
-  "status": "ok",
-  "version": "0.1.25"
-}
-```
+### Auth API
 
-### 条目 API
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/register` | Register user (first user always allowed, auto-admin) |
+| POST | `/api/v1/auth/login` | Login, returns JWT |
+| POST | `/api/v1/auth/logout` | Logout (client-side token clear) |
+| GET | `/api/v1/auth/me` | Get current user info (requires JWT) |
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/v1/entries` | 列出入库（支持分页、搜索） |
-| POST | `/api/v1/entries` | 创建新条目 |
-| GET | `/api/v1/entries/{slug}` | 获取条目详情 |
-| PATCH | `/api/v1/entries/{slug}` | 更新条目 |
-| DELETE | `/api/v1/entries/{slug}` | 删除条目 |
-| GET | `/api/v1/entries/{slug}/files/{file_id}` | 获取文件信息 |
-| GET | `/api/v1/entries/{slug}/files/{file_id}/content` | 获取文件内容 |
+### API Key Management
 
-详细 API 文档请参考源码中的 `peekview/api/` 目录。
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/v1/apikeys` | Create API key | JWT |
+| GET | `/api/v1/apikeys` | List user's API keys | JWT |
+| DELETE | `/api/v1/apikeys/{key_id}` | Revoke API key | JWT (owner/admin) |
+| DELETE | `/api/v1/apikeys/expired` | Cleanup expired keys | JWT |
 
-## 特性
+**API Key format**: `pv_` prefix + 24-char token, HMAC-SHA256 hashed for storage.
+**Max active keys**: 10 per user.
+**Expiration options**: Never, 7d, 30d, 90d.
 
-- 🎨 **代码高亮** - 基于 Shiki 的语法高亮，支持 100+ 语言
-- 📝 **Markdown 渲染** - 支持 GitHub 风格 Markdown
-- 🔍 **全文搜索** - 基于 SQLite FTS5 的高性能搜索
-- 📂 **多文件支持** - 单条目支持多文件，树形展示
-- 🌓 **主题切换** - 深色/浅色模式，自动跟随系统
-- 📱 **移动端适配** - 响应式设计，底部工具栏
-- 🔗 **URL 友好** - 支持 slug 和文件路径参数
-- 🔒 **安全防护** - 路径遍历防护、API 认证、XSS 过滤
+### Authentication Methods
 
-## 技术栈
+1. **JWT** — `Authorization: Bearer <jwt>` for user-level auth
+2. **User-level API Key** — `X-API-Key: pv_...` or `Authorization: Bearer pv_...` (bound to user, JWT-equivalent permissions)
+3. **Global API Key** — `X-API-Key: <PEEKVIEW_SERVER__API_KEY>` or `Authorization: Bearer <key>` (service-level, creates ownerless entries)
 
-- **后端**: FastAPI + SQLModel + SQLite (FTS5)
-- **前端**: Vue 3 + Vite + Shiki + TypeScript
+### Visibility Rules
+
+- Anonymous users see only `is_public=true` entries
+- Authenticated users see all public entries + own private entries
+- Direct access to private entry returns 404 (unless owner/admin)
+- Only owner or admin can toggle visibility or delete an entry
+- If `allow_anonymous_create=false`, anonymous entry creation returns 401
+
+## Features
+
+- 🎨 **Code Highlighting** — Shiki with 100+ languages
+- 📝 **Markdown Rendering** — GitHub-flavored Markdown with TOC
+- 🔍 **Full-Text Search** — SQLite FTS5
+- 📂 **Multi-file Support** — File tree per entry
+- 🌐 **REST API** — Full CRUD with multiple auth methods
+- 🔐 **User Authentication** — JWT register/login/logout
+- 🔑 **API Key Management** — User-level pv_ keys with expiration
+- 🔒 **Security** — Path traversal protection, allowlist, XSS filtering
+- 👤 **Entry Visibility** — Public/private with owner controls
+
+## Tech Stack
+
+- **Backend**: FastAPI + SQLModel + SQLite (FTS5)
+- **Frontend**: Vue 3 + Vite + Shiki + TypeScript
 - **CLI**: Click + Rich
 
-## 开发
+## Development
 
 ```bash
-# 克隆仓库
 git clone https://github.com/randomgitsrc/peekview.git
 cd peekview/backend
-
-# 安装开发依赖
 pip install -e ".[test,dev]"
-
-# 运行测试
-make test
-
-# 格式化代码
-make format
-
-# 启动开发服务器
-make dev
+make test      # 393 tests
+make dev       # Start dev server
 ```
 
-## 许可证
+## License
 
 MIT License
