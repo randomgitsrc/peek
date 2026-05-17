@@ -155,6 +155,30 @@ BASE_URL=http://127.0.0.1:8888 npx playwright test --ui
 
 **注意**: E2E 测试通过 ≠ 用户体验 OK，必须人工确认！
 
+### 步骤 5.5: E2E 后生产数据检查（v0.1.28 教训，强制）
+
+**E2E 测试结束后，必须验证生产数据未被污染！**
+
+```bash
+# 1. 检查生产环境有无 e2e- 测试数据
+curl -s http://127.0.0.1:8080/api/v1/entries | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+e2e = sum(1 for e in d['items'] if 'e2e-' in e['slug'])
+print(f'生产条目: {d[\"total\"]}, E2E污染: {e2e}')
+if e2e > 0:
+    print('⚠️ 警告: 生产数据库被 E2E 测试数据污染！')
+    print('   请检查调试服务是否正确使用了 /tmp/peekview-debug/ 数据库')
+"
+# 期望: E2E污染: 0
+
+# 2. 如果发现污染，立即排查
+# 常见原因:
+#   - 调试服务未设置 PEEKVIEW_STORAGE__DB_PATH，使用了默认的 ~/.peekview/peekview.db
+#   - E2E 测试 BASE_URL 指向了 8080（生产）而非 8888（调试）
+#   - 手动运行 peekview create 时未指定 --remote-url
+```
+
 ### 步骤 6: 清理与发布
 
 ```bash
@@ -164,6 +188,13 @@ make debug-stop
 # 执行发布流程（如果用户已确认）
 make pre-publish
 make publish
+
+# 升级并重启生产服务（必须！pipx upgrade 不会自动重启）
+pipx upgrade peekview
+sudo systemctl restart peekview
+
+# 验证服务版本
+curl -s http://127.0.0.1:8080/health
 ```
 
 **清理后验证**:
@@ -171,6 +202,10 @@ make publish
 # 确认生产数据完整
 curl -s http://127.0.0.1:8080/api/v1/entries | jq '.total'
 # 应与调试前数量一致
+
+# 确认版本已更新
+curl -s http://127.0.0.1:8080/health | jq '.version'
+# 应为新发布版本
 ```
 
 ## 调试检查清单
@@ -186,6 +221,7 @@ curl -s http://127.0.0.1:8080/api/v1/entries | jq '.total'
 ### 修改后
 - [ ] **数据隔离验证**: `make debug-verify-isolation` 通过
 - [ ] E2E 自动化测试通过
+- [ ] **E2E 后生产数据检查**: 无 e2e- 测试数据污染生产库
 - [ ] 用户手动验证通过
 - [ ] 确认可以进入发布流程
 
@@ -325,3 +361,5 @@ ps aux | grep peekview
 4. **用户确认是发布前提** - 自动化测试通过 ≠ 用户体验 OK
 5. **Python 版本很重要** - dev-server.sh 必须使用安装了 peekview 的 Python 3.12+ (v0.1.25 教训)
 6. **E2E 测试必须设置 BASE_URL** - 否则 Playwright 会连接默认的 Vite 开发服务器 (v0.1.25 教训)
+7. **pipx upgrade 后必须重启服务** - 升级包不重启 = 仍运行旧版本 (v0.1.28 教训)
+8. **E2E 后必须检查生产数据** - 确保 e2e- 测试数据未写入生产库 (v0.1.28 教训)

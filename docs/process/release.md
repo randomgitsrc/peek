@@ -93,6 +93,20 @@ make pre-publish
 make publish
 ```
 
+### 5.5 升级并重启生产服务
+
+```bash
+# 升级 pipx 包
+pipx upgrade peekview
+peekview --version   # 确认版本号正确
+
+# 重启生产服务（必须！否则仍运行旧版本）
+sudo systemctl restart peekview
+
+# 验证服务已更新
+curl -s http://127.0.0.1:8080/health   # 确认 version 是新版本
+```
+
 ### 6. 创建并推送标签
 
 ```bash
@@ -145,10 +159,24 @@ pip index versions peekview
 # 2. 检查 GitHub Tags
 open https://github.com/randomgitsrc/peekview/releases
 
-# 3. 测试安装
+# 3. 升级并验证版本
 pipx upgrade peekview
 peekview --version
+
+# 4. 重启生产服务（必须！pipx upgrade 不会自动重启）
+sudo systemctl restart peekview
+
+# 5. 验证生产服务已更新
+curl -s http://127.0.0.1:8080/health
+# 必须确认 version 字段是新版本号！
+
+# 6. 验证生产数据完整
+curl -s http://127.0.0.1:8080/api/v1/entries | jq '.total'
+# 应与调试前数量一致，无 e2e- 测试数据
 ```
+
+**⚠️ 关键**: `pipx upgrade` 只更新包文件，不重启正在运行的服务。
+必须手动 `sudo systemctl restart peekview`，否则服务仍运行旧版本。
 
 ### 发布失败恢复
 

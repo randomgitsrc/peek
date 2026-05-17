@@ -451,3 +451,80 @@ api_key.last_used_at = now.replace(tzinfo=None)
 **解决**:
 - 测试中先注册 "admin_user"，再注册实际测试用户
 - 或在测试断言中考虑 admin 权限
+
+---
+
+## pipx upgrade 不重启服务
+
+### 教训 13: 升级包后必须手动重启生产服务
+
+**问题**: pipx upgrade 到 0.1.27 后，`curl /health` 仍返回 0.1.24
+
+**原因**:
+- `pipx upgrade peekview` 只更新 venv 中的包文件
+- systemd 管理的进程仍在内存中运行旧代码
+- Python 进程不会自动重载已安装的包
+
+**解决**:
+```bash
+# 发布后必须执行这两步
+pipx upgrade peekview
+sudo systemctl restart peekview   # 必须手动重启！
+
+# 验证
+curl -s http://127.0.0.1:8080/health  # 确认 version 字段已更新
+```
+
+**预防**: release.md 已增加步骤 5.5（升级并重启生产服务）
+
+---
+
+## E2E 测试数据污染生产库
+
+### 教训 14: E2E 测试后必须检查生产数据完整性
+
+**问题**: 生产数据库出现 92 条 e2e- 前缀的测试条目和 5 个测试用户
+
+**原因**:
+- 某次 E2E 测试时调试服务配置错误，使用了默认的 `~/.peekview/peekview.db` 而非 `/tmp/peekview-debug/peekview.db`
+- 或者 E2E 的 BASE_URL 指向了 8080（生产端口）而非 8888（调试端口）
+- 生产服务 v0.1.24 无认证，任何人可写入
+
+**解决**:
+```bash
+# E2E 测试后强制检查（debug-workflow.md 步骤 5.5）
+curl -s http://127.0.0.1:8080/api/v1/entries | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+e2e = sum(1 for e in d['items'] if 'e2e-' in e['slug'])
+print(f'生产条目: {d[\"total\"]}, E2E污染: {e2e}')
+if e2e > 0:
+    print('⚠️ 生产数据库被 E2E 测试数据污染！')
+"
+```
+
+**预防**:
+- debug-workflow.md 增加 E2E 后生产数据检查步骤
+- dev-server.sh 启动时验证 DB 路径不在 ~/.peekview/ 下
+
+---
+
+## 前端字段缺失防御
+
+### 教训 15: API 字段缺失时前端必须合理兜底
+
+**问题**: v0.1.24 API 不返回 `is_public` 字段，升级后前端 `!undefined = true`，所有条目显示 "private" 标记
+
+**原因**:
+- 旧版 API 无 `is_public` 字段，返回 JSON 中无此 key
+- 前端 `entry.is_public` 为 `undefined`
+- `v-if="!entry.isPublic"` → `!undefined` → `true`，所有条目标记 private
+
+**解决**:
+```typescript
+// client.ts: API 字段缺失时默认合理值
+isPublic: entry.is_public ?? true,    // 缺失 = 公开（向后兼容）
+ownerId: entry.owner_id ?? null,      // 缺失 = 无 owner
+```
+
+**预防**: 所有新增 API 字段在前端映射时，用 `??` 提供合理默认值

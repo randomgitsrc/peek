@@ -49,6 +49,15 @@ start_server() {
     mkdir -p "$DATA_DIR/data"
     rm -f "$PID_FILE" "$LOG_FILE"
 
+    # 安全检查: 确保 DB_PATH 不在生产目录下 (v0.1.28 教训)
+    if echo "$DB_PATH" | grep -q "\.peekview"; then
+        echo "✗ 错误: DB_PATH 指向生产目录!"
+        echo "   DB_PATH=$DB_PATH"
+        echo "   调试服务必须使用 /tmp/peekview-debug/ 目录"
+        echo "   请检查 scripts/dev-server.sh 的 DATA_DIR 变量"
+        exit 1
+    fi
+
     # 检查静态文件是否存在
     if [ ! -f "backend/peekview/static/index.html" ]; then
         echo "✗ 错误: 静态文件不存在"
