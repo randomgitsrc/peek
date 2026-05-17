@@ -426,5 +426,10 @@ setup-hooks:
 	@bash scripts/setup-doc-automation.sh
 	@echo "✓ Git hooks 安装完成"
 	@echo ""
-	@echo "钩子功能:"
-	@echo "  - pre-commit: 提交前自动检查文档一致性"
+	@echo "本地保护（pre-commit hook）："
+	@echo "  - 版本文件变更时强制检查版本一致性"
+	@echo "  - 每次提交输出文档更新 checklist"
+	@echo ""
+	@echo "云端保护（GitHub Actions，push 后自动触发）："
+	@echo "  - ci.yml: 后端测试 + 前端构建 + 文档一致性"
+	@echo "  - publish.yml: push vX.Y.Z tag 时自动发布"
