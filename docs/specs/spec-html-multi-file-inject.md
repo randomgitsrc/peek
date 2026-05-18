@@ -1,8 +1,8 @@
 # PeekView HTML 多文件资源注入 技术设计文档
 
-> 版本: 1.0
+> 版本: 1.1
 > 日期: 2026-05-18
-> 状态: 草案
+> 状态: 草案（已纳入专家评审意见）
 > 关联: [spec-html-render.md](spec-html-render.md) §3.4 多文件行为 — 已知限制扩展
 > 前置: HTML 网页渲染功能已上线（HtmlViewer.vue）
 
@@ -110,8 +110,10 @@ iframe (sandbox="allow-scripts")
 function normalizeRef(ref: string): string | null {
   const trimmed = ref.trim()
   if (!trimmed) return null
-  // 排除绝对路径和特殊协议
+  // 排除协议绝对路径：https:// http:// // data: # mailto: tel:
   if (/^(https?:|\/\/|data:|#|mailto:|tel:)/.test(trimmed)) return null
+  // 排除路径绝对引用：/absolute/path.css（会请求服务器根路径，不是相对引用）
+  if (trimmed.startsWith('/')) return null
   // 去除 ./ 前缀
   return trimmed.replace(/^\.\//, '')
 }
@@ -145,7 +147,11 @@ console.log('hello')
 </script>
 ```
 
-仅处理无 `type` 或 `type="text/javascript"` 的 `<script>`。`type="module"` 的 script 注入后仍为 inline，行为一致（module 默认 defer，inline module 也 defer）。
+仅处理无 `type` 或 `type="text/javascript"` / `type="module"` 的 `<script>`。
+
+**`type="module"` 的已知限制：**
+注入后变为 inline module，`import './utils.js'` 等内部相对路径引用仍无法解析（inline module 没有文件 URL 上下文）。
+如果模块文件内部有 `import` 语句，注入后交互仍可能失败。此为已知限制，记录在 §6 不在范围内。
 
 ### 3.6 安全性
 
@@ -197,8 +203,12 @@ function injectResources(html: string, siblings: SiblingFile[]): string {
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
 
-  // 构建 filename → content 映射
-  const fileMap = new Map(siblings.map(f => [normalizeRef(f.filename)!, f.content]))
+  // 构建 filename → content 映射（过滤 normalizeRef 返回 null 的异常情况）
+  const fileMap = new Map(
+    siblings
+      .map(f => [normalizeRef(f.filename), f.content] as const)
+      .filter((entry): entry is [string, string] => entry[0] !== null)
+  )
 
   // 替换 <link rel="stylesheet" href="...">
   doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
@@ -243,33 +253,81 @@ function initRender(content: string) {
 - 先执行注入，再检测剩余未替换的相对路径
 - 或者：检测时排除已在 siblingFiles 中匹配的引用
 
-**推荐方案**：注入后对处理过的 HTML 重新检测，只显示真正无法解析的引用数。
+**方案**：注入完成后，对处理过的 HTML（`<link>` 已替换为 `<style>`）重新运行 `relativePathCount` 检测。
+
+- 已成功注入的引用：节点已被替换，检测时不再出现 → 自动从计数中消失
+- 未匹配的引用（文件不在 siblingFiles 中）：节点保留，继续计入警告数
+
+**部分匹配示例**：3 个引用，2 个注入成功，1 个找不到对应文件 → 警告条显示"含 1 个本地资源引用"。
+**全部注入成功**：警告条消失。
 
 ### 4.4 EntryDetailView 变更
 
-当前 `EntryDetailView` 已有 `entry.files` 列表。需要将文件内容传递给 HtmlViewer：
+**背景约束：**
+
+`FileResponse` 模型不含 `content` 字段（只有 id/filename/language/size/line_count）。
+前端文件内容是**按需、逐个获取**的：用户切换到某文件时才 fetch 其内容（`api.getFileContent(slug, file.id)`）。
+因此 `siblingFiles` 的内容不能从已有数据直接取得，必须在渲染 HTML 文件时主动 fetch。
+
+**选型：B2 — EntryDetailView 统一 fetch，HtmlViewer 只负责渲染**
+
+职责划分：
+- `EntryDetailView`：检测到当前文件为 HTML 时，并行 fetch 所有兄弟文件内容，将结果传给 HtmlViewer
+- `HtmlViewer`：接收 `siblingFiles` prop，只负责注入和渲染，不做数据获取
+
+不选 B1（HtmlViewer 自己 fetch）的原因：组件职责会从"展示"变为"数据获取+展示"，违反现有架构约定（store/view 负责数据，组件负责展示）。
+
+**实现：**
+
+```typescript
+// entry store 或 EntryDetailView 内
+const siblingFilesContent = ref<SiblingFile[]>([])
+const isFetchingSiblings = ref(false)
+
+// 当前文件切换为 HTML 时触发
+watch(
+  () => entryStore.activeFile,
+  async (file) => {
+    siblingFilesContent.value = []
+    if (!file || file.language !== 'html') return
+    if (!currentEntry.value) return
+
+    const siblings = currentEntry.value.files.filter(f => f.id !== file.id && !f.is_binary)
+    if (siblings.length === 0) return
+
+    isFetchingSiblings.value = true
+    try {
+      const results = await Promise.all(
+        siblings.map(async f => ({
+          filename: f.filename,
+          language: f.language ?? '',
+          content: await api.getFileContent(currentEntry.value!.slug, f.id),
+        }))
+      )
+      siblingFilesContent.value = results
+    } finally {
+      isFetchingSiblings.value = false
+    }
+  },
+  { immediate: true }
+)
+```
 
 ```vue
 <HtmlViewer
-  :content="currentFileContent"
-  :sibling-files="siblingFilesForHtml"
+  :content="entryStore.fileContent"
+  :sibling-files="siblingFilesContent"
 />
 ```
 
-```typescript
-const siblingFilesForHtml = computed(() => {
-  if (!entry.value || !currentFile.value) return []
-  return entry.value.files
-    .filter(f => f.id !== currentFile.value!.id)  // 排除自身
-    .map(f => ({
-      filename: f.filename,
-      content: f.content ?? '',  // 需要文件内容
-      language: f.language,
-    }))
-})
-```
+**loading 态：**
 
-**注意**：当前 API 返回的文件列表可能不含 `content`（详情页需要单独获取文件内容）。需要确认 API 是否已在 entry 详情中返回所有文件内容。
+`isFetchingSiblings` 为 true 时，HtmlViewer 显示 Loading 态（等待兄弟文件内容到齐后再注入渲染）。
+可通过 `siblingFiles` prop 为 `undefined`（未传）vs `[]`（已 fetch 完、无兄弟文件）来区分"正在加载"和"无兄弟文件"两种状态。
+
+**只 fetch 文本文件：**
+
+二进制文件（`is_binary === true`）跳过 fetch，注入阶段也不处理（二进制内容无法内联为文本）。
 
 ---
 
@@ -308,6 +366,18 @@ const siblingFilesForHtml = computed(() => {
 | **P3** | 子目录路径支持（`css/main.css`） | 低（匹配逻辑扩展） |
 
 P1 覆盖 90% 的 Agent 生成场景（HTML + CSS + JS 三件套）。
+
+---
+
+## 6.1 已知限制
+
+| 限制 | 说明 |
+|------|------|
+| 子目录路径（`css/main.css`）| P1 不支持，P3 再扩展 |
+| 二进制资源（图片/字体）| P1 不支持，P2 再扩展 |
+| `type="module"` 内部 import | inline module 无文件 URL，内部 import 仍失败 |
+| `outerHTML` 丢失 DOCTYPE | DOMParser 序列化不含 `<!DOCTYPE html>`，对渲染无实质影响，但需知晓 |
+| 空文件内容 | 注入空 `<style>` / `<script>`，不崩溃，但也无效果 |
 
 ---
 
