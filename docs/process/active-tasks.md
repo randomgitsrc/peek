@@ -114,3 +114,11 @@
 - **状态**: ✅ 已完成 (v0.1.3)
 - **完成日期**: 2026-04-22
 - **详情**: 见 INDEX.md
+
+## 技术债记录
+
+### TD-001：语言判断逻辑分散在两处
+- **位置**：`entry.ts`（canWrap 里的 language 判断）vs `EntryDetailView.vue`（isHtml / isMarkdown computed）
+- **影响**：后端 language 值变更时需改两处
+- **建议**：未来重构时把 isHtml / isMarkdown 提升到 store，与 canWrap 统一
+- **发现于**：P2 代码评审（p2-code-review.md）

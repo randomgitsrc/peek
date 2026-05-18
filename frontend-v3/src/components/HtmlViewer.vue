@@ -13,7 +13,7 @@
       <button
         data-testid="relative-path-warning-close"
         class="warning-close"
-        @click="showRelativePathWarning = false"
+        @click="relativePathWarningDismissed = true"
         aria-label="关闭警告"
       >
         ✕
@@ -69,6 +69,7 @@
         referrerpolicy="no-referrer"
         class="html-frame"
         @load="onIframeLoad"
+        @error="onIframeError"
       />
     </div>
   </div>
@@ -103,8 +104,8 @@ const contentSize = computed(() => {
 const fileSizeLabel = computed(() => {
   const size = contentSize.value
   if (size >= SIZE_BLOCK) return `${(size / (1024 * 1024)).toFixed(1)} MB`
-  if (size >= SIZE_WARN)  return `${(size / 1024).toFixed(0)} KB`
-  return `${size} B`
+  // fileSizeLabel 只在 size >= SIZE_WARN 时显示，KB 分支是实际最小值
+  return `${(size / 1024).toFixed(0)} KB`
 })
 
 // ── 大文件策略 ────────────────────────────────────────────────────────────
@@ -144,11 +145,17 @@ const relativePathCount = computed(() => {
   }
 })
 
-const showRelativePathWarning = ref(false)
+// 用户是否主动关闭了警告（切换文件时 content 变更自动重置）
+const relativePathWarningDismissed = ref(false)
 
-watch(relativePathCount, (count) => {
-  showRelativePathWarning.value = count > 0
-}, { immediate: true })
+watch(() => props.content, () => {
+  relativePathWarningDismissed.value = false
+})
+
+// 单一 computed 决定显示逻辑，避免 ref+watch 隐式耦合
+const showRelativePathWarning = computed(() =>
+  relativePathCount.value > 0 && !relativePathWarningDismissed.value
+)
 
 // ── Blob URL 管理 ─────────────────────────────────────────────────────────
 const blobUrl   = ref<string | null>(null)
@@ -196,6 +203,11 @@ onUnmounted(() => {
 
 // ── iframe 加载状态 ───────────────────────────────────────────────────────
 function onIframeLoad() {
+  isLoading.value = false
+}
+
+// Blob URL 加载失败时也退出 loading 态，防止 Loading 永久卡住
+function onIframeError() {
   isLoading.value = false
 }
 </script>
