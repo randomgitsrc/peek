@@ -209,6 +209,13 @@
         Download
       </button>
       <button
+        v-if="entryStore.canPack && entryStore.currentEntry"
+        class="btn btn-sm"
+        @click="downloadPack"
+      >
+        Pack
+      </button>
+      <button
         v-if="showTocButton"
         class="btn btn-sm"
         @click="showTocDrawer = true"
@@ -472,9 +479,30 @@ function downloadFile() {
   URL.revokeObjectURL(url)
 }
 
-function downloadPack() {
+async function downloadPack() {
   if (!currentEntry.value) return
-  console.log('Download pack for:', currentEntry.value.slug)
+
+  try {
+    const response = await fetch(`/api/v1/entries/${currentEntry.value.slug}/download`)
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${currentEntry.value.slug}.zip`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.show('Pack downloaded', 'success')
+  } catch (e) {
+    console.error('Pack download error:', e)
+    toast.show('Failed to download pack', 'error')
+  }
 }
 
 function extractHeadings(content: string): TocHeading[] {

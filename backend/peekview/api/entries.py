@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import io
+import zipfile
+
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from peekview.auth import get_current_user
 from peekview.exceptions import AuthenticationError
@@ -215,3 +218,52 @@ async def delete_entry(
             is_admin=is_admin,
         )
     return {"ok": True}
+
+
+@router.get("/{slug}/download")
+async def download_entry_files(
+    slug: str,
+    request: Request,
+    service: EntryService = Depends(_get_service),
+    current_user: User | None = Depends(get_current_user),
+):
+    """Download all entry files as a zip archive."""
+    global_key_auth = _is_global_api_key_auth(request, current_user)
+
+    if global_key_auth:
+        entry = service.get_entry_by_api_key(slug)
+    else:
+        current_user_id = current_user.id if current_user else None
+        is_admin = current_user.is_admin if current_user else False
+
+        entry = service.get_entry(
+            slug,
+            current_user_id=current_user_id,
+            is_admin=is_admin,
+        )
+
+    if not entry.files:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "NO_FILES", "message": "Entry has no files to download"}},
+        )
+
+    # Create zip in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_record in entry.files:
+            # Get the actual disk path
+            disk_path = service.storage.get_disk_path(entry.id, file_record.path or file_record.filename)
+            if disk_path.exists():
+                # Use stored path or filename for zip entry
+                arcname = file_record.path or file_record.filename
+                zf.write(disk_path, arcname=arcname)
+
+    zip_buffer.seek(0)
+
+    filename = f"{entry.slug}.zip"
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
