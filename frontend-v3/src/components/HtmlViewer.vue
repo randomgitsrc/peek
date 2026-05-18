@@ -32,7 +32,9 @@
       </span>
     </div>
 
-    <!-- 大文件手动触发（> 2MB） -->
+    <!-- 大文件手动触发（> 2MB）
+         v-if/v-else 链：showManualRender 为 true 时显示手动触发区，
+         否则显示 iframe 容器（含 loading 态）-->
     <div v-if="showManualRender" class="html-manual-render">
       <div class="manual-render-info">
         <span class="file-size-icon">📄</span>
@@ -47,9 +49,9 @@
       </div>
     </div>
 
-    <!-- iframe 容器 -->
+    <!-- iframe 容器（正常渲染 / 512KB~2MB 时也显示此区域）-->
     <div v-else class="html-frame-container">
-      <!-- Loading 态 -->
+      <!-- Loading 态：blobUrl 创建后到 iframe load 事件前 -->
       <div
         v-if="isLoading"
         data-testid="html-loading"
@@ -59,13 +61,12 @@
         <span>渲染中...</span>
       </div>
 
-      <!-- iframe -->
+      <!-- iframe：content 非空且 blobUrl 已创建时显示 -->
       <iframe
         v-if="blobUrl"
         :src="blobUrl"
         sandbox="allow-scripts"
         referrerpolicy="no-referrer"
-        scrolling="yes"
         class="html-frame"
         @load="onIframeLoad"
       />
@@ -76,21 +77,26 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, inject } from 'vue'
 
+// ── 测试注入 key（Symbol 避免命名冲突，定义在 HtmlViewerTestKeys.ts）────
+import { HTML_VIEWER_TEST_SIZE_KEY } from './HtmlViewerTestKeys'
+
 const props = defineProps<{
   content: string
 }>()
-
-// ── 测试注入点（仅测试环境使用，生产环境忽略）─────────────────────────────
-const testContentSize = inject<number | null>('__testContentSize', null)
 
 // ── 文件大小阈值 ──────────────────────────────────────────────────────────
 const SIZE_WARN  = 512 * 1024       // 512KB
 const SIZE_BLOCK = 2 * 1024 * 1024  // 2MB
 
+// 测试环境可注入虚假大小；生产环境用字符数近似字节数
+// 注意：JS 字符串为 UTF-16，content.length 是字符数而非字节数。
+// Blob 实际用 UTF-8 编码，多字节字符（如中文）会导致实际体积更大。
+// 此处用字符数作近似，对纯 ASCII HTML 误差极小；含大量多字节字符时
+// 实际 Blob 可能比阈值计算结果更大，可接受的已知偏差。
+const testContentSize = inject<number | null>(HTML_VIEWER_TEST_SIZE_KEY, null)
+
 const contentSize = computed(() => {
-  // 测试环境允许注入虚假大小
   if (testContentSize !== null && testContentSize !== undefined) return testContentSize
-  // 生产：JS 字符串为 UTF-16，1 字符 ≈ 2 字节，这里用字符数近似
   return props.content.length
 })
 
@@ -102,8 +108,8 @@ const fileSizeLabel = computed(() => {
 })
 
 // ── 大文件策略 ────────────────────────────────────────────────────────────
-const showSizeWarning  = computed(() => contentSize.value >= SIZE_WARN  && contentSize.value < SIZE_BLOCK)
-const isBlockedBySize  = computed(() => contentSize.value >= SIZE_BLOCK)
+const showSizeWarning   = computed(() => contentSize.value >= SIZE_WARN && contentSize.value < SIZE_BLOCK)
+const isBlockedBySize   = computed(() => contentSize.value >= SIZE_BLOCK)
 const manuallyTriggered = ref(false)
 const showManualRender  = computed(() => isBlockedBySize.value && !manuallyTriggered.value)
 
@@ -113,7 +119,7 @@ function triggerManualRender() {
 
 // ── 相对路径检测 ─────────────────────────────────────────────────────────
 // 检测范围：静态 HTML 属性（href / src / action）
-// 不覆盖 JS 动态创建的资源请求（已知限制）
+// 不覆盖 JS 动态创建的资源请求（已知限制，见 spec §3.4）
 const relativePathCount = computed(() => {
   if (!props.content) return 0
   try {
@@ -145,7 +151,7 @@ watch(relativePathCount, (count) => {
 }, { immediate: true })
 
 // ── Blob URL 管理 ─────────────────────────────────────────────────────────
-const blobUrl = ref<string | null>(null)
+const blobUrl   = ref<string | null>(null)
 const isLoading = ref(false)
 
 function createBlobUrl(content: string): string {
@@ -158,6 +164,8 @@ function revokeBlobUrl(url: string | null) {
 }
 
 function initRender(content: string) {
+  // 空内容不渲染，避免创建空 Blob 导致 iframe 短暂闪白
+  if (!content) return
   // 大文件且未手动触发，不创建 Blob URL
   if (isBlockedBySize.value && !manuallyTriggered.value) return
 
@@ -166,7 +174,7 @@ function initRender(content: string) {
   blobUrl.value = createBlobUrl(content)
 }
 
-// content 变更时重新渲染
+// content 变更时重新渲染（entry 切换文件时 content 会先置空再填充）
 watch(
   () => props.content,
   (newContent) => {
@@ -200,38 +208,26 @@ function onIframeLoad() {
   overflow: hidden;
 }
 
-/* ── 警告条 ── */
+/* ── 警告条（使用项目 CSS 变量，自动跟随主题）── */
 .html-warning {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-xs);
   flex-shrink: 0;
 }
 
 .relative-path-warning {
-  background: var(--color-warning-bg, #fff8e1);
-  border-bottom: 1px solid var(--color-warning-border, #f9a825);
-  color: var(--color-warning-text, #6d4c00);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  color: var(--warning-text);
 }
 
 .size-warning {
-  background: var(--color-info-bg, #e3f2fd);
-  border-bottom: 1px solid var(--color-info-border, #1565c0);
-  color: var(--color-info-text, #0d47a1);
-}
-
-[data-theme="dark"] .relative-path-warning {
-  background: #3d3000;
-  border-color: #f9a825;
-  color: #ffe57f;
-}
-
-[data-theme="dark"] .size-warning {
-  background: #0d2137;
-  border-color: #1565c0;
-  color: #90caf9;
+  background: var(--accent-light);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
 }
 
 .warning-icon {
@@ -247,18 +243,19 @@ function onIframeLoad() {
   border: none;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: inherit;
   opacity: 0.7;
   flex-shrink: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .warning-close:hover {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.08);
 }
 
-/* ── 手动触发 ── */
+/* ── 手动触发区 ── */
 .html-manual-render {
   flex: 1;
   display: flex;
@@ -268,18 +265,18 @@ function onIframeLoad() {
 
 .manual-render-info {
   text-align: center;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .file-size-icon {
   font-size: 48px;
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .manual-render-info p {
-  margin-bottom: 16px;
-  font-size: 14px;
+  margin-bottom: var(--space-4);
+  font-size: var(--font-sm);
 }
 
 /* ── iframe 容器 ── */
@@ -296,18 +293,18 @@ function onIframeLoad() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  background: var(--color-bg-primary);
-  color: var(--color-text-secondary);
-  font-size: 14px;
+  gap: var(--space-3);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
   z-index: 1;
 }
 
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--color-border-secondary);
-  border-top-color: var(--color-accent);
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -321,6 +318,7 @@ function onIframeLoad() {
   height: 100%;
   border: none;
   display: block;
-  background: #fff;
+  background: transparent; /* 由 iframe 内容自己决定背景色 */
+  overflow: auto;          /* 替代过时的 scrolling 属性 */
 }
 </style>

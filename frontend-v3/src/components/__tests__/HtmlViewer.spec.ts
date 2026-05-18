@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import HtmlViewer from '../HtmlViewer.vue'
+import { HTML_VIEWER_TEST_SIZE_KEY } from '../HtmlViewerTestKeys'
 
 // ─── Mock URL.createObjectURL / revokeObjectURL ──────────────────────────────
 const mockBlobUrl = 'blob:null/mock-uuid-1234'
@@ -205,7 +206,7 @@ describe('大文件分级处理', () => {
     const wrapper = mount(HtmlViewer, {
       props: { content: SIMPLE_HTML },
       global: {
-        provide: { __testContentSize: 600 * 1024 },
+        provide: { [HTML_VIEWER_TEST_SIZE_KEY]: 600 * 1024 },
       },
     })
     await flushPromises()
@@ -219,7 +220,7 @@ describe('大文件分级处理', () => {
     const wrapper = mount(HtmlViewer, {
       props: { content: SIMPLE_HTML },
       global: {
-        provide: { __testContentSize: 3 * MB },
+        provide: { [HTML_VIEWER_TEST_SIZE_KEY]: 3 * MB },
       },
     })
     await flushPromises()
@@ -232,7 +233,7 @@ describe('大文件分级处理', () => {
   it('恰好 512KB：显示性能警告，仍自动渲染', async () => {
     const wrapper = mount(HtmlViewer, {
       props: { content: SIMPLE_HTML },
-      global: { provide: { __testContentSize: 512 * 1024 } },
+      global: { provide: { [HTML_VIEWER_TEST_SIZE_KEY]: 512 * 1024 } },
     })
     await flushPromises()
 
@@ -244,7 +245,7 @@ describe('大文件分级处理', () => {
   it('恰好 2MB：不自动渲染，显示手动触发按钮', async () => {
     const wrapper = mount(HtmlViewer, {
       props: { content: SIMPLE_HTML },
-      global: { provide: { __testContentSize: 2 * MB } },
+      global: { provide: { [HTML_VIEWER_TEST_SIZE_KEY]: 2 * MB } },
     })
     await flushPromises()
 
@@ -256,7 +257,7 @@ describe('大文件分级处理', () => {
     const wrapper = mount(HtmlViewer, {
       props: { content: SIMPLE_HTML },
       global: {
-        provide: { __testContentSize: 3 * MB },
+        provide: { [HTML_VIEWER_TEST_SIZE_KEY]: 3 * MB },
       },
     })
     await flushPromises()
