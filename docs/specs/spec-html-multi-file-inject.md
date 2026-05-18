@@ -1,8 +1,8 @@
 # PeekView HTML 多文件资源注入 技术设计文档
 
-> 版本: 1.1
+> 版本: 1.2
 > 日期: 2026-05-18
-> 状态: 草案（已纳入专家评审意见）
+> 状态: 草案（已纳入两轮专家评审意见）
 > 关联: [spec-html-render.md](spec-html-render.md) §3.4 多文件行为 — 已知限制扩展
 > 前置: HTML 网页渲染功能已上线（HtmlViewer.vue）
 
@@ -248,18 +248,15 @@ function initRender(content: string) {
 
 ### 4.3 相对路径警告更新
 
-注入后，已成功替换的引用不应再计入警告计数。更新 `relativePathCount` 逻辑：
+`injectResources` 同时返回 `{ html, unmatchedCount }`，`unmatchedCount` 即为注入后剩余未匹配的相对路径数，直接用于警告条计数，**无需二次 DOMParser 解析**。
 
-- 先执行注入，再检测剩余未替换的相对路径
-- 或者：检测时排除已在 siblingFiles 中匹配的引用
+- 注入成功的节点已替换为 `<style>`/`<script>`，`countRelativePathsInDoc` 统计时不再出现
+- 未匹配节点保留，继续被统计
 
-**方案**：注入完成后，对处理过的 HTML（`<link>` 已替换为 `<style>`）重新运行 `relativePathCount` 检测。
-
-- 已成功注入的引用：节点已被替换，检测时不再出现 → 自动从计数中消失
-- 未匹配的引用（文件不在 siblingFiles 中）：节点保留，继续计入警告数
-
-**部分匹配示例**：3 个引用，2 个注入成功，1 个找不到对应文件 → 警告条显示"含 1 个本地资源引用"。
-**全部注入成功**：警告条消失。
+**示例：**
+- 3 个引用，2 个注入成功，1 个找不到文件 → `unmatchedCount=1` → 警告条显示"含 1 个本地资源引用"
+- 全部注入成功 → `unmatchedCount=0` → 警告条消失
+- 单文件场景（无 `siblingFiles`）→ `injectResources` 直接返回原始 HTML 的相对路径计数
 
 ### 4.4 EntryDetailView 变更
 
@@ -329,6 +326,11 @@ watch(
 
 二进制文件（`is_binary === true`）跳过 fetch，注入阶段也不处理（二进制内容无法内联为文本）。
 
+**竞态防护：** 用户快速切换时过期的 `Promise.allSettled` 可能晚于新切换才 resolve。使用递增 token 防护：
+```typescript
+let fetchToken = 0  // 每次切换递增，resolve 时校验 token 是否仍为当前值
+```
+
 ---
 
 ## 5. 测试计划
@@ -354,6 +356,7 @@ watch(
 | 多文件 HTML 应用 | index.html + styles.css + app.js 渲染正确，样式和交互生效 |
 | 相对路径警告消失 | 注入成功后无警告条 |
 | 部分匹配 | 存在不匹配引用时，仅对未匹配项显示警告 |
+| **竞态：快速切换** | 先切到 HTML，立刻切到非 HTML，再切回 HTML；最终渲染内容属于最后一次 HTML 文件，无残留数据 |
 
 ---
 
