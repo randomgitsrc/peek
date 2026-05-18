@@ -11,6 +11,27 @@
 
 import { test, expect } from '@playwright/test'
 
+// CRITICAL: Verify we're running against debug server, not production
+test.beforeAll(async ({ request }) => {
+  const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:8888'
+  if (baseUrl.includes(':8080') || baseUrl.includes('peek.gsis.top') || baseUrl.includes('prod')) {
+    throw new Error(
+      `FATAL: E2E tests configured for PRODUCTION (${baseUrl}). ` +
+      `Run 'make debug-start' then 'make debug-test'.`
+    )
+  }
+
+  // Verify debug server is responding
+  try {
+    const response = await request.get('/health')
+    if (!response.ok()) {
+      throw new Error(`Debug server health check failed: ${response.status()}`)
+    }
+  } catch {
+    throw new Error(`FATAL: Cannot connect to debug server at ${baseUrl}`)
+  }
+})
+
 // ─── 测试数据 ─────────────────────────────────────────────────────────────────
 
 // 1x1 red pixel PNG (PIL-generated, verified)

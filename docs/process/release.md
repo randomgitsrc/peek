@@ -95,17 +95,39 @@ make publish
 
 ### 5.5 升级并重启生产服务
 
+**⚠️ CRITICAL: 这一步必须由用户手动执行，严禁自动化！**
+
+在升级生产服务之前，必须完成以下检查：
+1. ✅ E2E 测试已通过
+2. ✅ 用户已人工验证功能正常
+3. ✅ 生产数据已备份或无风险
+4. ✅ 确认没有测试数据污染生产数据库
+
 ```bash
-# 升级 pipx 包
+# 1. 升级 pipx 包
 pipx upgrade peekview
 peekview --version   # 确认版本号正确
 
-# 重启生产服务（必须！否则仍运行旧版本）
-sudo systemctl restart peekview
+# 2. ⚠️  重启前验证：检查生产数据库无测试数据
+curl -s http://127.0.0.1:8080/api/v1/entries | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+test_count = sum(1 for e in d['items'] if 'e2e-' in e['slug'] or 'test-' in e['slug'])
+if test_count > 0:
+    print(f'⚠️  WARNING: Found {test_count} test entries in production!')
+    print('   Clean up before restart or investigate data pollution.')
+else:
+    print(f'✓ Production database clean ({d[\"total\"]} entries)')
+"
 
-# 验证服务已更新
+# 3. 用户确认后，手动重启生产服务
+# sudo systemctl restart peekview
+
+# 4. 验证服务已更新
 curl -s http://127.0.0.1:8080/health   # 确认 version 是新版本
 ```
+
+**禁止**: 在任何脚本中自动执行 `sudo systemctl restart peekview`
 
 ### 6. 创建并推送标签
 

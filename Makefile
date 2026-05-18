@@ -92,14 +92,14 @@ build-backend:
 	find backend -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find backend -type f -name "*.pyc" -delete
 	@echo "→ Building backend wheel..."
-	cd backend && python3 -m build --wheel
+	cd backend cd backend && python3 -m buildcd backend && python3 -m build /usr/bin/python3 -m build --wheel
 	@echo "✓ Backend wheel built"
 
 # Build backend wheel (fast) - minimal cleanup
 build-backend-fast:
 	@echo "→ Building backend wheel (fast)..."
 	cd backend && rm -rf dist *.egg-info build
-	cd backend && python3 -m build --wheel
+	cd backend cd backend && python3 -m buildcd backend && python3 -m build /usr/bin/python3 -m build --wheel
 	@echo "✓ Backend wheel built"
 
 # =============================================================================
@@ -355,6 +355,22 @@ debug-verify-isolation:
 	else \
 		echo "  ⚠ 调试服务未运行"; \
 	fi
+	@echo "→ 检查生产数据库是否被污染..."
+	@PROD_TEST_COUNT=$$(curl -s http://127.0.0.1:8080/api/v1/entries 2>/dev/null | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    test_count = sum(1 for e in d.get('items',[]) if 'e2e-' in e.get('slug','') or 'test-' in e.get('slug',''))
+    print(test_count)
+except:
+    print('0')" 2>/dev/null || echo "0") && \
+	if [ "$$PROD_TEST_COUNT" = "0" ]; then \
+		echo "  ✓ 生产数据库无测试数据污染"; \
+	else \
+		echo "  ✗ ✗ ✗ 严重警告: 生产数据库发现 $$PROD_TEST_COUNT 条测试数据!"; \
+		echo "    立即检查并清理污染数据!"; \
+		echo "    命令: curl http://127.0.0.1:8080/api/v1/entries | grep 'e2e-'"; \
+	fi
 	@echo "✓ 数据隔离验证完成"
 
 debug-stop:
@@ -364,6 +380,17 @@ debug-stop:
 	@echo "✓ 调试数据已清理"
 
 debug-test:
+	@echo "=== E2E 测试安全启动 ==="
+	@echo "→ 检查生产服务是否运行..."
+	@if curl -s http://127.0.0.1:8080/health > /dev/null 2>&1; then \
+		echo "⚠  警告: 生产服务正在运行 (端口 8080)"; \
+		PROD_COUNT=$$(curl -s http://127.0.0.1:8080/api/v1/entries 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total',0))" 2>/dev/null || echo "0"); \
+		echo "   当前生产条目数: $$PROD_COUNT"; \
+		echo "   如果测试数据写入生产，将被检测到"; \
+	else \
+		echo "ℹ  生产服务未运行"; \
+	fi
+	@echo ""
 	@bash scripts/run-e2e-tests.sh
 
 debug-test-remote:

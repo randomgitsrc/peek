@@ -14,8 +14,35 @@ const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8888'
 const testEntries: string[] = []
 
 // ========================================
-// Helper Functions
+// Production Safety Check
 // ========================================
+
+test.beforeAll(async ({ request }) => {
+  // CRITICAL: Verify we're NOT connecting to production
+  const baseUrl = BASE_URL
+  if (baseUrl.includes(':8080') || baseUrl.includes('peek.gsis.top') || baseUrl.includes('prod')) {
+    throw new Error(
+      `FATAL: E2E tests are configured to run against PRODUCTION (${baseUrl}). ` +
+      `Tests must only run against debug server on :8888. ` +
+      `Run 'make debug-start' first, then 'make debug-test'.`
+    )
+  }
+
+  // Verify debug server is running and responding
+  try {
+    const response = await request.get('/health')
+    if (!response.ok()) {
+      throw new Error(`Debug server health check failed: ${response.status()}`)
+    }
+    const health = await response.json()
+    console.log(`Connected to debug server version ${health.version}`)
+  } catch (error) {
+    throw new Error(
+      `FATAL: Cannot connect to debug server at ${baseUrl}. ` +
+      `Run 'make debug-start' first.`
+    )
+  }
+})
 
 async function createTestEntry(page: any, slug: string, data: any) {
   const response = await page.request.post('/api/v1/entries', {
