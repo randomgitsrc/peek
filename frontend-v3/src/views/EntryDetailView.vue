@@ -413,9 +413,11 @@ const isHtml = computed(() => {
 
 const isImage = computed(() => {
   const file = activeFile.value
-  if (!file || !file.isBinary) return false
+  if (!file) return false
   const mime = guessMimeType(file.filename)
-  return mime?.startsWith('image/') ?? false
+  // SVG is text format, others are binary
+  if (mime === 'image/svg+xml') return true
+  return file.isBinary && (mime?.startsWith('image/') ?? false)
 })
 
 const showFileSidebar = computed(() => {
