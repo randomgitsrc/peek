@@ -85,32 +85,3 @@ describe('entry store canWrap', () => {
   })
 })
 
-// ─── 渲染分支：mount EntryDetailView，验证正确的 viewer 被渲染 ────────────────
-// 注意：EntryDetailView 依赖 router 和 store，需要完整挂载环境
-// 此处只验证 isHtml computed 和 canWrap 的 store 层逻辑
-// 完整的渲染分支切换（HtmlViewer vs CodeViewer 出现/消失）由 E2E 覆盖
-describe('渲染分支 isHtml computed（store 层验证）', () => {
-  beforeEach(() => {
-    setActivePinia(createPinia())
-  })
-
-  it('HTML 文件：activeFile.language 为 html', () => {
-    const store = useEntryStore()
-    store.$patch({ activeFile: makeFile({ language: 'html' }) })
-    expect(store.activeFile?.language).toBe('html')
-  })
-
-  it('Markdown 文件：activeFile.language 为 markdown', () => {
-    const store = useEntryStore()
-    store.$patch({ activeFile: makeFile({ filename: 'README.md', language: 'markdown' }) })
-    expect(store.activeFile?.language).toBe('markdown')
-  })
-
-  it('CSS 文件：activeFile.language 不为 html 也不为 markdown', () => {
-    const store = useEntryStore()
-    store.$patch({ activeFile: makeFile({ filename: 'style.css', language: 'css' }) })
-    const lang = store.activeFile?.language
-    expect(lang).not.toBe('html')
-    expect(lang).not.toBe('markdown')
-  })
-})

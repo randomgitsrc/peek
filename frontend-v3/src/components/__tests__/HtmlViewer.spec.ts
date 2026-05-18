@@ -240,6 +240,29 @@ describe('大文件分级处理', () => {
     expect(wrapper.find('[data-testid="manual-render-btn"]').exists()).toBe(true)
   })
 
+  it('恰好 512KB：显示性能警告，仍自动渲染', async () => {
+    const wrapper = mount(HtmlViewer, {
+      props: { content: SIMPLE_HTML },
+      global: { provide: { __testContentSize: 512 * 1024 } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="size-warning"]').exists()).toBe(true)
+    expect(wrapper.find('iframe').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="manual-render-btn"]').exists()).toBe(false)
+  })
+
+  it('恰好 2MB：不自动渲染，显示手动触发按钮', async () => {
+    const wrapper = mount(HtmlViewer, {
+      props: { content: SIMPLE_HTML },
+      global: { provide: { __testContentSize: 2 * MB } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="manual-render-btn"]').exists()).toBe(true)
+  })
+
   it('> 2MB：点击手动触发后正常渲染', async () => {
     const wrapper = mount(HtmlViewer, {
       props: { content: SIMPLE_HTML },

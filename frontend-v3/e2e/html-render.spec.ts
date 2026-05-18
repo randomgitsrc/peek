@@ -107,7 +107,7 @@ test.describe('HTML 渲染基础', () => {
     await expect(iframe.locator('#main-heading')).toHaveText('Hello from iframe')
   })
 
-  test('TC-HTML-003: CDN 外链资源正常加载', async ({ page }) => {
+  test('TC-HTML-003: CDN 外链不被 sandbox 阻断，页面正常渲染', async ({ page }) => {
     await page.goto('/e2e-html-cdn')
     await waitForIframe(page)
 
@@ -257,25 +257,24 @@ test.describe('安全沙盒验证', () => {
 
     await page.goto('/e2e-html-security')
     await waitForIframe(page)
-    await page.waitForTimeout(500)
 
-    // iframe 内脚本执行失败，title 应为 SANDBOX_INTACT
     const iframe = page.frameLocator('iframe.html-frame')
-    const title = await iframe.locator('title').textContent().catch(() => '')
-    expect(title).not.toBe('ESCAPE_SUCCESS')
+    // 等待 iframe 内脚本执行完成（DOM 等待替代硬等待）
+    await expect(iframe.locator('body')).toContainText('top.location blocked', { timeout: 3000 })
+    // 正向断言：title 必须为 SANDBOX_INTACT，否则沙盒逃逸成功或脚本未执行
+    await expect(iframe.locator('title')).toHaveText('SANDBOX_INTACT', { timeout: 3000 })
   })
 
   test('TC-HTML-SEC-002: iframe 内 top.location 修改被阻止', async ({ page }) => {
     await page.goto('/e2e-html-security')
     await waitForIframe(page)
-    await page.waitForTimeout(500)
-
-    expect(page.url()).not.toContain('evil.com')
-    expect(page.url()).toContain('localhost')
 
     const iframe = page.frameLocator('iframe.html-frame')
-    const bodyText = await iframe.locator('body').textContent().catch(() => '')
-    expect(bodyText).toContain('top.location blocked')
+    // 等待脚本执行完成，同时验证 top.location 被阻断
+    await expect(iframe.locator('body')).toContainText('top.location blocked', { timeout: 3000 })
+    // 验证页面没有被跳转
+    expect(page.url()).not.toContain('evil.com')
+    expect(page.url()).toContain('localhost')
   })
 })
 
