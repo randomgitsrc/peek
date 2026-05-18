@@ -13,6 +13,9 @@ import { test, expect } from '@playwright/test'
 
 // ─── 测试数据 ─────────────────────────────────────────────────────────────────
 
+// 1x1 red pixel PNG (PIL-generated, verified)
+const RED_PIXEL_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='
+
 const SIMPLE_HTML = `<!DOCTYPE html>
 <html>
   <head><title>Test Page</title></head>
@@ -392,5 +395,172 @@ test.describe('移动端布局', () => {
     await expect(page.locator('.mobile-actions')).toBeVisible()
 
     await page.screenshot({ path: 'test-results/tc-html-040-mobile.png' })
+  })
+})
+
+// ─── Test Suite: 二进制资源注入 ──────────────────────────────────────────────
+
+test.describe('二进制资源注入', () => {
+  const BINARY_INJECT_HTML = `<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="favicon.png">
+</head>
+<body>
+  <h1 id="binary-heading">Binary Inject Test</h1>
+  <img id="test-img" src="logo.png" alt="test image">
+  <img src="https://cdn.example.com/external.png">
+</body>
+</html>`
+
+  const BINARY_CSS = `body { background: #ffe; }
+#binary-heading { color: blue; }`
+
+  test.beforeAll(async ({ request }) => {
+    // Full injection: CSS + PNG image + favicon — no warnings
+    const binaryRes = await request.post('/api/v1/entries', {
+      data: {
+        slug: 'e2e-html-binary',
+        summary: 'HTML E2E - e2e-html-binary',
+        files: [
+          { filename: 'index.html', content: BINARY_INJECT_HTML },
+          { filename: 'styles.css', content: BINARY_CSS },
+          // Binary files use content_base64 field for proper decoding
+          { filename: 'logo.png', content_base64: RED_PIXEL_PNG_BASE64 },
+          { filename: 'favicon.png', content_base64: RED_PIXEL_PNG_BASE64 },
+        ],
+      },
+    })
+    expect(binaryRes.ok()).toBeTruthy()
+
+    // Partial: CSS + image, no favicon — 1 unmatched warning
+    const partialRes = await request.post('/api/v1/entries', {
+      data: {
+        slug: 'e2e-html-binary-partial',
+        summary: 'HTML E2E - e2e-html-binary-partial',
+        files: [
+          { filename: 'index.html', content: BINARY_INJECT_HTML },
+          { filename: 'styles.css', content: BINARY_CSS },
+          { filename: 'logo.png', content_base64: RED_PIXEL_PNG_BASE64 },
+        ],
+      },
+    })
+    expect(partialRes.ok()).toBeTruthy()
+  })
+
+  test('TC-HTML-BIN-001: 图片 data URI 注入 — img src 替换', async ({ page }) => {
+    await page.goto('/e2e-html-binary')
+    await waitForIframe(page)
+
+    const iframe = page.frameLocator('iframe.html-frame')
+    const img = iframe.locator('#test-img')
+    await expect(img).toBeVisible()
+
+    // Verify src contains data URI, not original filename
+    const src = await img.getAttribute('src')
+    expect(src).toContain('data:image/png;base64,')
+    expect(src).not.toContain('logo.png')
+  })
+
+  test('TC-HTML-BIN-002: 全部注入成功后无相对路径警告', async ({ page }) => {
+    await page.goto('/e2e-html-binary')
+    await waitForIframe(page)
+
+    // CSS + logo.png + favicon.png all injected
+    // Only https://cdn.example.com/external.png remains (CDN, not relative)
+    await expect(page.locator('[data-testid="relative-path-warning"]')).not.toBeVisible()
+
+    await page.screenshot({ path: 'test-results/tc-html-bin-002-no-warning.png' })
+  })
+
+  test('TC-HTML-BIN-003: 部分注入 — favicon 未注入显示警告', async ({ page }) => {
+    await page.goto('/e2e-html-binary-partial')
+    await waitForIframe(page)
+
+    // styles.css + logo.png injected; favicon.png not provided → 1 unmatched
+    const warning = page.locator('[data-testid="relative-path-warning"]')
+    await expect(warning).toBeVisible()
+    await expect(warning).toContainText('1')
+  })
+})
+
+// ─── Test Suite: 目录树层级结构 ────────────────────────────────────────────────
+
+test.describe('目录树层级结构', () => {
+  // Flat entry (no path hierarchy)
+  const FLAT_HTML = '<html><body><h1>Flat</h1></body></html>'
+  const FLAT_CSS = 'body { color: red; }'
+
+  // Hierarchical entry (3-level paths)
+  const NESTED_HTML = `<!DOCTYPE html>
+<html>
+<head><link rel="stylesheet" href="css/style.css"></head>
+<body><h1>Nested</h1></body>
+</html>`
+  const NESTED_CSS = 'body { color: blue; }'
+
+  test.beforeAll(async ({ request }) => {
+    await createEntry(request, 'e2e-tree-flat', [
+      { filename: 'index.html', content: FLAT_HTML },
+      { filename: 'style.css', content: FLAT_CSS },
+    ])
+    await createEntry(request, 'e2e-tree-nested', [
+      { filename: 'index.html', content: NESTED_HTML, path: 'index.html' },
+      { filename: 'style.css', content: NESTED_CSS, path: 'css/style.css' },
+      { filename: 'logo.png', content_base64: RED_PIXEL_PNG_BASE64, path: 'assets/images/logo.png' },
+    ])
+  })
+
+  test('TC-TREE-01: 层级 entry 显示嵌套目录树', async ({ page }) => {
+    await page.goto('/e2e-tree-nested')
+    await page.waitForTimeout(2000)
+
+    // Should have dir-item nodes for directories
+    const dirItems = page.locator('.dir-item')
+    await expect(dirItems).toHaveCount(3) // css, assets, images
+
+    // Should have dir-name for each directory
+    const dirNames = page.locator('.dir-name')
+    const names = await dirNames.allTextContents()
+    expect(names).toContain('css')
+    expect(names).toContain('assets')
+    expect(names).toContain('images')
+  })
+
+  test('TC-TREE-02: 点击文件跳转内容，点击目录折叠/展开', async ({ page }) => {
+    // Set desktop viewport to ensure sidebar is visible
+    await page.setViewportSize({ width: 1280, height: 800 })
+
+    await page.goto('/e2e-tree-nested')
+    await page.waitForTimeout(2000)
+
+    // Click file in directory
+    const cssFile = page.locator('.file-name', { hasText: 'style.css' })
+    await cssFile.click()
+
+    // Should show CodeViewer content
+    await expect(page.locator('.code-body')).toBeVisible()
+
+    // Click directory to collapse
+    await page.locator('.dir-name', { hasText: 'css' }).click()
+    // CSS files should be hidden (collapsed)
+    await expect(page.locator('.file-name', { hasText: 'style.css' })).not.toBeVisible()
+
+    // Click directory again to expand
+    await page.locator('.dir-name', { hasText: 'css' }).click()
+    await expect(page.locator('.file-name', { hasText: 'style.css' })).toBeVisible()
+  })
+
+  test('TC-TREE-03: 扁平 entry 仍显示扁平列表（无 .dir-item）', async ({ page }) => {
+    await page.goto('/e2e-tree-flat')
+    await page.waitForTimeout(2000)
+
+    // No directory nodes
+    await expect(page.locator('.dir-item')).toHaveCount(0)
+
+    // Only file nodes
+    await expect(page.locator('.file-item')).toHaveCount(2)
+    await expect(page.locator('.file-name')).toHaveCount(2)
   })
 })

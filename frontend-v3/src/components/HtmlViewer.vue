@@ -87,11 +87,23 @@ const props = defineProps<{
   loadingSiblings?: boolean
 }>()
 
-export interface SiblingFile {
+export interface TextSiblingFile {
   filename: string
+  path?: string | null  // 完整路径（如 'css/style.css'），用于层级目录匹配
   content: string
   language: string
+  isBinary: false
 }
+
+export interface BinarySiblingFile {
+  filename: string
+  path?: string | null  // 完整路径（如 'assets/logo.png'），用于层级目录匹配
+  content: string       // base64 编码的二进制内容
+  mimeType: string      // 如 'image/png'
+  isBinary: true
+}
+
+export type SiblingFile = TextSiblingFile | BinarySiblingFile
 
 // ── 文件大小阈值 ──────────────────────────────────────────────────────────
 const SIZE_WARN  = 512 * 1024       // 512KB
@@ -149,11 +161,19 @@ function injectResources(
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
 
-  const fileMap = new Map(
-    siblings
-      .map(f => [normalizeRef(f.filename), f.content] as const)
-      .filter((entry): entry is [string, string] => entry[0] !== null)
-  )
+  const textSiblings = siblings.filter((f): f is TextSiblingFile => f.isBinary !== true)
+  const binarySiblings = siblings.filter((f): f is BinarySiblingFile => f.isBinary === true)
+
+  // 文本资源 map：filename + path → content string
+  // 同时用 filename（basename）和 path（层级路径）作为 key，
+  // 以匹配 <link href="style.css"> 和 <link href="css/style.css">
+  const fileMap = new Map<string, string>()
+  for (const f of textSiblings) {
+    const byName = normalizeRef(f.filename)
+    if (byName) fileMap.set(byName, f.content)
+    const byPath = normalizeRef(f.path ?? '')
+    if (byPath && byPath !== byName) fileMap.set(byPath, f.content)
+  }
 
   // CSS: <link rel="stylesheet"> → <style>
   doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
@@ -165,11 +185,6 @@ function injectResources(
   })
 
   // JS: <script src> → inline <script>，移到 body 末尾
-  // 外部脚本在加载完成时执行（DOM 已就绪），内联脚本则同步执行。
-  // 若保留原位（如 <head>），执行时 <body> 尚未解析，DOM 查询会失败。
-  // 移到 body 末尾可保证 DOM 就绪后再执行。
-  // type="module" 排除注入：inline module 内部 import 静默失败，
-  // 保留原节点 404 → 计入警告条，行为更透明
   doc.querySelectorAll('script[src]').forEach(script => {
     const src = normalizeRef(script.getAttribute('src') ?? '')
     if (!src || !fileMap.has(src)) return
@@ -180,6 +195,34 @@ function injectResources(
     script.remove()
     doc.body.appendChild(inline)
   })
+
+  // 二进制资源：安全 src 元素 → data URI
+  if (binarySiblings.length > 0) {
+    // 二进制资源 map：filename + path → BinarySiblingFile
+    const binaryMap = new Map<string, BinarySiblingFile>()
+    for (const f of binarySiblings) {
+      const byName = normalizeRef(f.filename)
+      if (byName) binaryMap.set(byName, f)
+      const byPath = normalizeRef(f.path ?? '')
+      if (byPath && byPath !== byName) binaryMap.set(byPath, f)
+    }
+
+    const SAFE_SRC_SELECTORS = ['img[src]', 'video[src]', 'audio[src]', 'source[src]', 'track[src]']
+    doc.querySelectorAll(SAFE_SRC_SELECTORS.join(',')).forEach(el => {
+      const src = normalizeRef(el.getAttribute('src') ?? '')
+      if (!src || !binaryMap.has(src)) return
+      const file = binaryMap.get(src)!
+      el.setAttribute('src', `data:${file.mimeType};base64,${file.content}`)
+    })
+
+    // favicon：<link rel="icon" href> → data URI
+    doc.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]').forEach(link => {
+      const href = normalizeRef(link.getAttribute('href') ?? '')
+      if (!href || !binaryMap.has(href)) return
+      const file = binaryMap.get(href)!
+      link.setAttribute('href', `data:${file.mimeType};base64,${file.content}`)
+    })
+  }
 
   const unmatchedCount = countRelativePathsInDoc(doc)
   return { html: serializeDoc(doc), unmatchedCount }
@@ -225,7 +268,7 @@ const blobUrl   = ref<string | null>(null)
 const isLoading = ref(false)
 
 function createBlobUrl(content: string): string {
-  const blob = new Blob([content], { type: 'text/html' })
+  const blob = new Blob([content], { type: 'text/html;charset=UTF-8' })
   return URL.createObjectURL(blob)
 }
 

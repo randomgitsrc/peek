@@ -143,6 +143,19 @@ class PeekAPI {
     return response.data
   }
 
+  async getFileAsBase64(slug: string, fileId: number): Promise<string> {
+    const response = await this.client.get(
+      `/entries/${slug}/files/${fileId}`,
+      { responseType: 'arraybuffer' }
+    )
+    const bytes = new Uint8Array(response.data)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+  }
+
   downloadFile(slug: string, fileId: number): string {
     return `${API_BASE}/entries/${slug}/files/${fileId}`
   }

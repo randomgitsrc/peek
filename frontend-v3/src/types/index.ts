@@ -15,7 +15,7 @@ export interface Entry {
 
 export interface File {
   id: number
-  path: string
+  path: string | null
   filename: string
   language: string | null
   isBinary: boolean
@@ -38,6 +38,15 @@ export interface ListEntriesParams {
   owner?: string
   page?: number
   perPage?: number
+}
+
+// File tree types
+export interface TreeNode {
+  name: string
+  fullPath: string
+  isDir: boolean
+  children: TreeNode[]
+  file?: File
 }
 
 // TOC types

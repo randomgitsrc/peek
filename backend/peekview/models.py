@@ -311,6 +311,10 @@ class FileCreate(SQLModel):
     path: str | None = Field(default=None, max_length=500)
     filename: str | None = Field(default=None, max_length=255)
     content: str | None = Field(default=None, description="File content as string")
+    content_base64: str | None = Field(
+        default=None,
+        description="File content as base64-encoded string (for binary files)",
+    )
     local_path: str | None = Field(
         default=None,
         description="Server-side path to read from (requires allowlist)",

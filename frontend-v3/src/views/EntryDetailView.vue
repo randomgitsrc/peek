@@ -122,6 +122,14 @@
             @select-heading="scrollToHeading"
           />
 
+          <!-- Image File -->
+          <ImageViewer
+            v-else-if="isImage"
+            :filename="entryStore.activeFile.filename"
+            :slug="slug"
+            :file-id="entryStore.activeFile.id"
+          />
+
           <!-- Code File -->
           <CodeViewer
             v-else
@@ -260,7 +268,9 @@ import { useToast } from '@/composables/useToast'
 import CodeViewer from '@/components/CodeViewer.vue'
 import MarkdownViewer from '@/components/MarkdownViewer.vue'
 import HtmlViewer from '@/components/HtmlViewer.vue'
+import ImageViewer from '@/components/ImageViewer.vue'
 import type { SiblingFile } from '@/components/HtmlViewer.vue'
+import { guessMimeType } from '@/utils/mime'
 import FileTree from '@/components/FileTree.vue'
 import TocNav from '@/components/TocNav.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -286,6 +296,7 @@ const showTocDrawer = ref(false)
 const siblingFilesContent = ref<SiblingFile[]>([])
 const isFetchingSiblings = ref(false)
 let fetchToken = 0
+const BINARY_SIZE_LIMIT = 768 * 1024  // 768KB → base64 后约 1MB
 
 watch(
   () => entryStore.activeFile,
@@ -294,24 +305,42 @@ watch(
     if (!file || file.language !== 'html') return
     if (!currentEntry.value) return
 
-    const siblings = currentEntry.value.files.filter(f => f.id !== file.id && !f.isBinary)
+    const siblings = currentEntry.value.files.filter(f => f.id !== file.id)
     if (siblings.length === 0) return
 
     isFetchingSiblings.value = true
     const token = ++fetchToken
     try {
       const settled = await Promise.allSettled(
-        siblings.map(async f => ({
-          filename: f.filename,
-          language: f.language ?? '',
-          content: await api.getFileContent(currentEntry.value!.slug, f.id),
-        }))
+        siblings.map(async (f): Promise<SiblingFile | null> => {
+          if (f.isBinary) {
+            if (f.size > BINARY_SIZE_LIMIT || f.size === 0) return null
+            const mimeType = guessMimeType(f.filename)
+            if (!mimeType) return null
+            const base64 = await api.getFileAsBase64(currentEntry.value!.slug, f.id)
+            return {
+              filename: f.filename,
+              path: f.path,
+              content: base64,
+              isBinary: true as const,
+              mimeType,
+            }
+          }
+          return {
+            filename: f.filename,
+            path: f.path,
+            language: f.language ?? '',
+            content: await api.getFileContent(currentEntry.value!.slug, f.id),
+            isBinary: false as const,
+          }
+        })
       )
       if (token !== fetchToken) return
 
       const results = settled
-        .filter((r): r is PromiseFulfilledResult<SiblingFile> => r.status === 'fulfilled')
+        .filter((r): r is PromiseFulfilledResult<SiblingFile | null> => r.status === 'fulfilled')
         .map(r => r.value)
+        .filter((v): v is SiblingFile => v !== null)
       const failedCount = settled.filter(r => r.status === 'rejected').length
       if (failedCount > 0) {
         toast.show(`${failedCount} 个资源文件加载失败，部分引用无法注入`, 'warning')
@@ -373,6 +402,13 @@ const isMarkdown = computed(() => {
 
 const isHtml = computed(() => {
   return activeFile.value?.language === 'html'
+})
+
+const isImage = computed(() => {
+  const file = activeFile.value
+  if (!file || !file.isBinary) return false
+  const mime = guessMimeType(file.filename)
+  return mime?.startsWith('image/') ?? false
 })
 
 const showFileSidebar = computed(() => {

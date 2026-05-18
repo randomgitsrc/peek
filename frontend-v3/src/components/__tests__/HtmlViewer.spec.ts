@@ -74,7 +74,7 @@ describe('Blob URL 创建与释放', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blob = (createObjectURLMock.mock.calls as any[][])[0][0]
     expect(blob).toBeInstanceOf(Blob)
-    expect((blob as Blob).type).toBe('text/html')
+    expect((blob as Blob).type).toBe('text/html;charset=utf-8')
 
     const iframe = wrapper.find('iframe')
     expect(iframe.exists()).toBe(true)
@@ -328,7 +328,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'styles.css', content: 'body { color: red; }', language: 'css' }],
+        siblingFiles: [{ filename: 'styles.css', content: 'body { color: red; }', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -345,7 +345,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'app.js', content: 'console.log("hi")', language: 'javascript' }],
+        siblingFiles: [{ filename: 'app.js', content: 'console.log("hi")', language: 'javascript', isBinary: false }],
       },
     })
     await flushPromises()
@@ -366,8 +366,8 @@ describe('多文件注入', () => {
       props: {
         content: HTML_MULTI,
         siblingFiles: [
-          { filename: 'styles.css', content: 'body {}', language: 'css' },
-          { filename: 'app.js', content: 'console.log(1)', language: 'javascript' },
+          { filename: 'styles.css', content: 'body {}', language: 'css', isBinary: false },
+          { filename: 'app.js', content: 'console.log(1)', language: 'javascript', isBinary: false },
         ],
       },
     })
@@ -384,7 +384,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: html,
-        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css' }],
+        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -398,7 +398,7 @@ describe('多文件注入', () => {
     const wrapper = mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css' }],
+        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -413,7 +413,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'favicon.ico', content: 'not-real', language: 'ico' }],
+        siblingFiles: [{ filename: 'favicon.ico', content: 'not-real', language: 'ico', isBinary: false }],
       },
     })
     await flushPromises()
@@ -429,7 +429,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'main.mjs', content: 'export default {}', language: 'javascript' }],
+        siblingFiles: [{ filename: 'main.mjs', content: 'export default {}', language: 'javascript', isBinary: false }],
       },
     })
     await flushPromises()
@@ -444,7 +444,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'data.json', content: '{}', language: 'json' }],
+        siblingFiles: [{ filename: 'data.json', content: '{}', language: 'json', isBinary: false }],
       },
     })
     await flushPromises()
@@ -458,7 +458,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'styles.css', content: '', language: 'css' }],
+        siblingFiles: [{ filename: 'styles.css', content: '', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -473,7 +473,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: html,
-        siblingFiles: [{ filename: './styles.css', content: 'body{}', language: 'css' }],
+        siblingFiles: [{ filename: './styles.css', content: 'body{}', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -487,7 +487,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: '/absolute/path.css', content: 'body{}', language: 'css' }],
+        siblingFiles: [{ filename: '/absolute/path.css', content: 'body{}', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -513,7 +513,7 @@ describe('多文件注入', () => {
     mount(HtmlViewer, {
       props: {
         content: HTML_MULTI,
-        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css' }],
+        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
@@ -528,11 +528,373 @@ describe('多文件注入', () => {
     const wrapper = mount(HtmlViewer, {
       props: {
         content: html,
-        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css' }],
+        siblingFiles: [{ filename: 'styles.css', content: 'body{}', language: 'css', isBinary: false }],
       },
     })
     await flushPromises()
 
     expect(wrapper.find('[data-testid="relative-path-warning"]').exists()).toBe(false)
+  })
+})
+
+// ─── 二进制资源注入 ──────────────────────────────────────────────────────────
+describe('二进制资源注入', () => {
+  const HTML_WITH_IMG = `
+<html>
+<head><link rel="icon" href="favicon.ico"></head>
+<body>
+  <img src="logo.png">
+  <img src="https://cdn.example.com/ok.png">
+</body>
+</html>
+`
+
+  const HTML_WITH_FONT = `
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    @font-face { font-family: 'Inter'; src: url('fonts/inter.woff2') format('woff2'); }
+  </style>
+</head>
+<body><p>Hello</p></body>
+</html>
+`
+
+  const HTML_IFRAME = `
+<html>
+<body>
+  <iframe src="inner.html"></iframe>
+  <object data="widget.swf"></object>
+  <embed src="plugin.swf">
+</body>
+</html>
+`
+
+  it('img src 替换为 data URI', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_WITH_IMG,
+        siblingFiles: [
+          { filename: 'logo.png', content: 'base64data==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:image/png;base64,base64data==')
+    expect(text).not.toContain('src="logo.png"')
+  })
+
+  it('favicon href 替换为 data URI', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_WITH_IMG,
+        siblingFiles: [
+          { filename: 'favicon.ico', content: 'icodata==', isBinary: true, mimeType: 'image/x-icon' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:image/x-icon;base64,icodata==')
+    expect(text).not.toContain('href="favicon.ico"')
+  })
+
+  it('CDN 外链 img 不替换', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_WITH_IMG,
+        siblingFiles: [
+          { filename: 'logo.png', content: 'base64data==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('src="https://cdn.example.com/ok.png"')
+  })
+
+  it('iframe/object/embed src 不注入（安全风险）', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_IFRAME,
+        siblingFiles: [
+          { filename: 'inner.html', content: '<html></html>', language: 'html', isBinary: false },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('src="inner.html"')
+    expect(text).toContain('data="widget.swf"')
+    expect(text).toContain('src="plugin.swf"')
+  })
+
+  it('video/audio/source/track src 可注入', async () => {
+    const html = `
+<html><body>
+  <video src="clip.mp4"></video>
+  <audio src="sound.mp3"></audio>
+</body></html>
+`
+    mount(HtmlViewer, {
+      props: {
+        content: html,
+        siblingFiles: [
+          { filename: 'clip.mp4', content: 'mp4data==', isBinary: true, mimeType: 'video/mp4' },
+          { filename: 'sound.mp3', content: 'mp3data==', isBinary: true, mimeType: 'audio/mpeg' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:video/mp4;base64,mp4data==')
+    expect(text).toContain('data:audio/mpeg;base64,mp3data==')
+  })
+
+  it('混合注入：CSS + JS + 图片同时注入', async () => {
+    const html = `
+<html>
+<head><link rel="stylesheet" href="style.css"></head>
+<body>
+  <img src="logo.png">
+  <script src="app.js"></script>
+</body>
+</html>
+`
+    mount(HtmlViewer, {
+      props: {
+        content: html,
+        siblingFiles: [
+          { filename: 'style.css', content: 'body{}', language: 'css', isBinary: false },
+          { filename: 'app.js', content: 'console.log(1)', language: 'javascript', isBinary: false },
+          { filename: 'logo.png', content: 'pngdata==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('/* injected from: style.css */')
+    expect(text).toContain('/* injected from: app.js */')
+    expect(text).toContain('data:image/png;base64,pngdata==')
+  })
+
+  it('CSS @font-face url() 不注入（仅处理 HTML 属性）', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_WITH_FONT,
+        siblingFiles: [
+          { filename: 'style.css', content: '@font-face { font-family: Inter; src: url(fonts/inter.woff2) }', language: 'css', isBinary: false },
+          { filename: 'fonts/inter.woff2', content: 'woff2data==', isBinary: true, mimeType: 'font/woff2' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    // @font-face url() inside CSS text is not processed by HTML attribute injection
+    expect(text).toContain('url(fonts/inter.woff2)')
+  })
+
+  it('匹配的二进制文件不计入 unmatchedCount', async () => {
+    const wrapper = mount(HtmlViewer, {
+      props: {
+        content: HTML_WITH_IMG,
+        siblingFiles: [
+          { filename: 'logo.png', content: 'base64data==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    // logo.png injected, favicon.ico is relative but no sibling → 1 unmatched
+    const warning = wrapper.find('[data-testid="relative-path-warning"]')
+    expect(warning.exists()).toBe(true)
+    expect(warning.text()).toContain('1')
+  })
+
+  it('全部二进制注入后警告消失', async () => {
+    const wrapper = mount(HtmlViewer, {
+      props: {
+        content: HTML_WITH_IMG,
+        siblingFiles: [
+          { filename: 'logo.png', content: 'base64data==', isBinary: true, mimeType: 'image/png' },
+          { filename: 'favicon.ico', content: 'icodata==', isBinary: true, mimeType: 'image/x-icon' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="relative-path-warning"]').exists()).toBe(false)
+  })
+
+  it('shortcut icon link href 替换为 data URI', async () => {
+    const html = '<html><head><link rel="shortcut icon" href="favicon.ico"></head><body></body></html>'
+    mount(HtmlViewer, {
+      props: {
+        content: html,
+        siblingFiles: [
+          { filename: 'favicon.ico', content: 'icodata==', isBinary: true, mimeType: 'image/x-icon' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:image/x-icon;base64,icodata==')
+  })
+})
+
+// ─── 层级目录路径匹配 ─────────────────────────────────────────────────────────
+describe('层级目录路径匹配', () => {
+  const HTML_NESTED = `<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/app.js"></script>
+  <link rel="icon" href="assets/favicon.png">
+</head>
+<body>
+  <h1>Nested Paths</h1>
+  <img src="assets/logo.png">
+  <img src="hero.png">
+</body>
+</html>`
+
+  it('层级路径通过 path 字段匹配 CSS 注入', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_NESTED,
+        siblingFiles: [
+          { filename: 'style.css', path: 'css/style.css', content: 'body { color: blue; }', language: 'css', isBinary: false },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('/* injected from: css/style.css */')
+    expect(text).toContain('body { color: blue; }')
+    expect(text).not.toMatch(/<link[^>]*href="css\/style\.css"/)
+  })
+
+  it('层级路径通过 path 字段匹配 JS 注入', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_NESTED,
+        siblingFiles: [
+          { filename: 'app.js', path: 'js/app.js', content: 'console.log("nested")', language: 'javascript', isBinary: false },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('/* injected from: js/app.js */')
+    expect(text).toContain('console.log("nested")')
+  })
+
+  it('层级路径通过 path 字段匹配二进制注入（img src）', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_NESTED,
+        siblingFiles: [
+          { filename: 'logo.png', path: 'assets/logo.png', content: 'logodata==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:image/png;base64,logodata==')
+    expect(text).not.toContain('src="assets/logo.png"')
+  })
+
+  it('层级路径通过 path 字段匹配 favicon 注入', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_NESTED,
+        siblingFiles: [
+          { filename: 'favicon.png', path: 'assets/favicon.png', content: 'favdata==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:image/png;base64,favdata==')
+    expect(text).not.toContain('href="assets/favicon.png"')
+  })
+
+  it('basename 仍可匹配同级引用（hero.png 无 path）', async () => {
+    mount(HtmlViewer, {
+      props: {
+        content: HTML_NESTED,
+        siblingFiles: [
+          { filename: 'hero.png', content: 'herodata==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    expect(text).toContain('data:image/png;base64,herodata==')
+    expect(text).not.toContain('src="hero.png"')
+  })
+
+  it('混合层级 + 同级：全部注入后无警告', async () => {
+    const wrapper = mount(HtmlViewer, {
+      props: {
+        content: HTML_NESTED,
+        siblingFiles: [
+          { filename: 'style.css', path: 'css/style.css', content: 'body{}', language: 'css', isBinary: false },
+          { filename: 'app.js', path: 'js/app.js', content: 'console.log(1)', language: 'javascript', isBinary: false },
+          { filename: 'favicon.png', path: 'assets/favicon.png', content: 'favdata==', isBinary: true, mimeType: 'image/png' },
+          { filename: 'logo.png', path: 'assets/logo.png', content: 'logodata==', isBinary: true, mimeType: 'image/png' },
+          { filename: 'hero.png', content: 'herodata==', isBinary: true, mimeType: 'image/png' },
+        ],
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="relative-path-warning"]').exists()).toBe(false)
+  })
+
+  it('path 与 filename 不同时两者均可作为匹配 key', async () => {
+    const html = '<html><head><link rel="stylesheet" href="style.css"></head><body></body></html>'
+    mount(HtmlViewer, {
+      props: {
+        content: html,
+        siblingFiles: [
+          { filename: 'style.css', path: 'css/style.css', content: 'body{}', language: 'css', isBinary: false },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const blob = (createObjectURLMock.mock.calls as any[][])[0][0] as Blob
+    const text = await blob.text()
+    // href="style.css" matches via filename key
+    expect(text).toContain('/* injected from: style.css */')
   })
 })

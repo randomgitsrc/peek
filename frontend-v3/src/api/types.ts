@@ -33,7 +33,7 @@ export interface EntryResponse {
 
 export interface FileResponse {
   id: number
-  path: string
+  path: string | null
   filename: string
   language: string | null
   is_binary: boolean
