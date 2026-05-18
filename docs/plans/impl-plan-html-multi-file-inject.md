@@ -63,7 +63,19 @@ function initRender(content: string) {
 
 **修改 loading 态**: `loadingSiblings=true` 时显示 Loading 态（复用现有 spinner UI），不创建 Blob URL。
 
-**修改 watch**: `siblingFiles` 变化时也重新渲染（与 `content` watch 合并或新增 watch）。
+**修改 watch**: `siblingFiles` 变化时也重新渲染，**新增独立 watch**（不与 content watch 合并）：
+
+```typescript
+// content 变化时重新渲染（已有）
+watch(() => props.content, (newContent) => { initRender(newContent) }, { immediate: true })
+
+// siblingFiles 到齐后触发渲染（新增）
+// 不合并到 content watch：合并会导致 content 先到时先渲染一次无注入版本，
+// siblingFiles 到了再渲染一次有注入版本，用户看到闪烁
+watch(() => props.siblingFiles, (siblings) => {
+  if (siblings && siblings.length > 0) initRender(props.content)
+})
+```
 
 **data-testid**: 无需新增，已有 `html-loading` / `relative-path-warning` 覆盖。
 
@@ -154,6 +166,8 @@ watch(
 | `type="module"` | 不注入，计入 unmatchedCount |
 | `type="application/json"` | 不替换 |
 | 空文件内容 | 不崩溃 |
+| siblingFile filename 含 `./` 前缀 | `normalizeRef` 正确 strip，匹配成功 |
+| siblingFile filename 为绝对路径 | `normalizeRef` 返回 null，文件静默跳过（不崩溃）|
 | loadingSiblings=true | 显示 Loading 态，不渲染 iframe |
 | DOCTYPE 保留 | 注入后 Blob 内容含 `<!DOCTYPE html>` |
 | unmatchedCount | 部分匹配时只计未注入数 |
@@ -230,4 +244,4 @@ watch(
 1. `cd frontend-v3 && npm run test` — 单元测试通过
 2. `cd frontend-v3 && npm run build` — 构建成功
 3. `make debug` — 构建 + 启动 + E2E 通过
-4. 浏览器 http://127.0.0.1:8888/sdrrti — 多文件 HTML demo 正常渲染，无警告条
+4. 手动创建包含 `index.html` + `styles.css` + `app.js` 的 entry，浏览器打开验证样式和交互生效、无警告条
