@@ -2,12 +2,61 @@
 
 > 轻量级代码与文档格式化展示服务
 
-Agent（AI）产出 → PeekView 格式化 → 人类友好查看
+**Agent（AI）产出 → PeekView 格式化 → 人类友好查看**
+
+**一句话开始：** `pipx install peekview && peekview serve && peekview create file.py -s "Hello"`
 
 [![Version](https://img.shields.io/badge/version-0.1.29-blue.svg)](https://github.com/randomgitsrc/peekview/releases)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3.4+-green.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## Agent 快速场景
+
+> 典型使用模式：Agent（AI）创建 → 人类在浏览器查看
+
+### 场景 1：分享代码片段
+
+```bash
+# Agent 创建条目
+peekview create solution.py -s "修复内存泄漏的方案"
+
+# 返回可分享的链接
+# http://localhost:8080/fix-memory-leak
+```
+
+### 场景 2：多文件项目展示
+
+```bash
+# Agent 上传整个项目目录
+peekview create src/*.py config.yaml -s "Web 爬虫项目" -t python
+
+# 人类在浏览器中看到：
+# - 左侧层级文件树（支持嵌套目录）
+# - 代码高亮 + 行号
+# - 一键 Pack 下载 ZIP
+```
+
+### 场景 3：HTML 交互演示
+
+```bash
+# Agent 创建带资源的 HTML 条目
+peekview create index.html style.css app.js -s "交互式图表演示"
+
+# HTML 在 iframe 沙盒中渲染，CSS/JS/图片自动注入
+```
+
+### 场景 4：AI 工作流集成
+
+```bash
+# Agent 从 stdin 直接推送
+claude code review.md | peekview create -s "代码审查报告" --from-stdin
+
+# 或结合其他 AI 工具
+cat analysis.json | jq -r '.summary' | peekview create -s "分析结果"
+```
 
 ---
 
