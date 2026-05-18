@@ -1,7 +1,7 @@
 # PeekView — 项目索引
 
-> 最后更新：2026-05-17
-> 当前版本：v0.1.28
+> 最后更新：2026-05-18
+> 当前版本：v0.1.29
 
 ---
 
@@ -46,7 +46,7 @@
 | 代码高亮 (Shiki) | ✅ | `composables/useShiki.ts`, `components/CodeViewer.vue` |
 | Markdown 渲染 | ✅ | `components/MarkdownViewer.vue` |
 | Mermaid 图表 | ✅ | `components/MermaidDiagram.vue` |
-| 文件树 | ✅ | `components/FileTree.vue` |
+| 文件树 | ✅ | `components/FileTree.vue`（支持层级目录结构）|
 | 主题切换 | ✅ | `composables/useTheme.ts` |
 | 移动端适配 | ✅ | `components/MobileBottomBar.vue`, `MobileFileDrawer.vue` |
 | 条目列表 + 分页 | ✅ | `views/EntryListView.vue`, `components/Pagination.vue` |
@@ -114,6 +114,9 @@ frontend-v3/src/
 | [spec-user-auth.md](docs/specs/spec-user-auth.md) | 用户认证规格 — JWT + 可见性 + API Key | ✅ 已实现（v0.1.25）|
 | [spec-remote-cli.md](docs/specs/spec-remote-cli.md) | 远程 CLI 规格 | ✅ 已实现（v0.1.25）|
 | [spec-html-render.md](docs/specs/spec-html-render.md) | HTML 网页渲染规格 — iframe 沙盒渲染 | ✅ 已实现（v0.1.28）|
+| [spec-file-tree.md](docs/specs/spec-file-tree.md) | FileTree 目录树层级结构规格 | ✅ 已实现（v0.1.29）|
+| [spec-html-multi-file-inject.md](docs/specs/spec-html-multi-file-inject.md) | HTML 多文件资源注入规格 | ✅ 已实现（v0.1.29）|
+| [spec-html-binary-inject.md](docs/specs/spec-html-binary-inject.md) | HTML 二进制资源注入规格 | ✅ 已实现（v0.1.29）|
 
 > MVP 阶段规格文档已归档至 `docs/archived/specs/`
 

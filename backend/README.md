@@ -127,7 +127,7 @@ remote:
 ### Health Check
 
 ```
-GET /health → { "status": "ok", "version": "0.1.28" }
+GET /health → { "status": "ok", "version": "0.1.29" }
 ```
 
 ### Entry API
@@ -141,6 +141,7 @@ GET /health → { "status": "ok", "version": "0.1.28" }
 | DELETE | `/api/v1/entries/{slug}` | Delete entry | Owner/Admin |
 | GET | `/api/v1/entries/{slug}/files/{file_id}` | Get file info | - |
 | GET | `/api/v1/entries/{slug}/files/{file_id}/content` | Get file content | - |
+| GET | `/api/v1/entries/{slug}/download` | Download entry as ZIP pack | - |
 
 \* Private entries require authentication. Entry creation may require auth if `allow_anonymous_create=false`.
 
@@ -191,11 +192,14 @@ GET /health → { "status": "ok", "version": "0.1.28" }
 - 🎨 **Code Highlighting** — Shiki with 100+ languages
 - 📝 **Markdown Rendering** — GitHub-flavored Markdown with TOC
 - 🔍 **Full-Text Search** — SQLite FTS5
-- 📂 **Multi-file Support** — File tree per entry
+- 📂 **Multi-file Support** — File tree per entry (hierarchical paths)
+- 🖼️ **HTML Rendering** — iframe sandbox with CSS/JS/image injection
+- 🖼️ **Image Viewer** — PNG/JPG/GIF/WebP/SVG support
+- 📦 **Pack Download** — ZIP download for multi-file entries
 - 🌐 **REST API** — Full CRUD with multiple auth methods
 - 🔐 **User Authentication** — JWT register/login/logout
 - 🔑 **API Key Management** — User-level pv_ keys with expiration
-- 🔒 **Security** — Path traversal protection, allowlist, XSS filtering
+- 🔒 **Security** — Path traversal protection, allowlist, XSS filtering, iframe sandbox
 - 👤 **Entry Visibility** — Public/private with owner controls
 
 ## Tech Stack

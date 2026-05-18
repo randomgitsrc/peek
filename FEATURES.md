@@ -1,6 +1,6 @@
 # Feature Matrix
 
-*Auto-generated on 2026-05-17*
+*Auto-generated on 2026-05-18*
 
 ## Frontend
 
@@ -30,6 +30,9 @@
 - ✅ Owner Actions (visibility toggle, delete)
 - ✅ All/Mine Entry Filtering
 - ✅ API Key Management (create/revoke/copy)
+- ✅ FileTree Hierarchical Structure (nested directories)
+- ✅ SVG Image Rendering
+- ✅ Pack Download (ZIP for multi-file entries)
 
 ## Backend
 
@@ -105,3 +108,31 @@
 - ✅ Multi-file entry: `.html` → iframe, other files → CodeViewer / MarkdownViewer
 - ✅ Copy HTML source (tooltip clarifies source code, not rendered text)
 - ✅ iframe load/error state with Loading indicator
+- ✅ Resource injection: CSS/JS files auto-injected via data URI
+- ✅ Binary resource injection: images (PNG/JPG/GIF/WebP/SVG) auto-converted to data URI
+- ✅ Hierarchical file paths support (nested directories in FileTree)
+- ✅ Security: sandbox prevents parent access, top.location modification blocked
+
+## Image Viewer
+
+- ✅ PNG/JPG/GIF/WebP/SVG support
+- ✅ Zoom in/out with mouse wheel
+- ✅ Large image warning (>5MB)
+- ✅ Image dimensions display
+- ✅ Download original file
+- ✅ Mobile gesture support
+
+## Pack Download
+
+- ✅ Multi-file entry ZIP download
+- ✅ Preserves directory structure
+- ✅ Desktop and mobile support
+- ✅ API endpoint: `/api/v1/entries/{slug}/download`
+
+## Production Data Protection
+
+- ✅ E2E test guards (beforeAll production check)
+- ✅ Script enforcement (run-e2e-tests.sh safety checks)
+- ✅ Makefile verification (debug-verify-isolation)
+- ✅ check-production-pollution.sh monitoring tool
+- ✅ Documentation: manual-only production restart
